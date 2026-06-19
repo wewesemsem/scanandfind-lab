@@ -1,0 +1,61 @@
+{
+  "refDate": "2026-05-24",
+  "users": [
+    {
+      "id": "average_adult_female",
+      "description": "5'5\" (165 cm), 137 lb (62 kg), female, 36 y, moderately active",
+      "profile": {
+        "dateOfBirth": "1990-01-15",
+        "gender": "female",
+        "heightCm": 165,
+        "weightKg": 62,
+        "activityLevel": "moderately_active",
+        "surveyResponses": { "pregnancyStatus": "not_pregnant" }
+      },
+      "expectedNotes": "Typical adult; maintenance ~2,000–2,100 kcal aligns with DGA-style tables.",
+      "plausibility": { "caloriesMin": 1800, "caloriesMax": 2300 }
+    },
+    {
+      "id": "short_heavy_female_moderate",
+      "description": "5'1\" (155 cm), 220 lb (100 kg), female, 36 y, moderately active",
+      "profile": {
+        "dateOfBirth": "1990-01-15",
+        "gender": "female",
+        "heightCm": 155,
+        "weightKg": 99.8,
+        "activityLevel": "moderately_active",
+        "surveyResponses": { "pregnancyStatus": "not_pregnant" }
+      },
+      "expectedNotes": "BMI ~41; adjusted body weight lowers estimate vs. raw 100 kg.",
+      "plausibility": { "caloriesMin": 1700, "caloriesMax": 2100 }
+    },
+    {
+      "id": "short_heavy_male_very_active",
+      "description": "5'1\" (155 cm), 220 lb (100 kg), male, 36 y, very active",
+      "profile": {
+        "dateOfBirth": "1990-01-15",
+        "gender": "male",
+        "heightCm": 155,
+        "weightKg": 99.8,
+        "activityLevel": "very_active",
+        "surveyResponses": { "pregnancyStatus": "not_pregnant" }
+      },
+      "expectedNotes": "Male + very active; adjusted weight pulls below naive high estimate.",
+      "plausibility": { "caloriesMin": 2300, "caloriesMax": 2700 }
+    },
+    {
+      "id": "tall_active_male",
+      "description": "6'2\" (188 cm), 180 lb (82 kg), male, 28 y, very active",
+      "profile": {
+        "dateOfBirth": "1998-01-15",
+        "gender": "male",
+        "heightCm": 188,
+        "weightKg": 82,
+        "activityLevel": "very_active",
+        "surveyResponses": { "pregnancyStatus": "not_pregnant" }
+      },
+      "expectedNotes": "Tall, lean, very active — higher maintenance band.",
+      "plausibility": { "caloriesMin": 2800, "caloriesMax": 3600 }
+    }
+  ]
+}

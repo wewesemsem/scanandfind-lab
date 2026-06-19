@@ -1,0 +1,9 @@
+run = "npm run population-eval && echo '' && npm run agent-eval -- --verbose"
+entrypoint = "population-eval/run-population-eval.js"
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm run population-eval && npm run agent-eval"]

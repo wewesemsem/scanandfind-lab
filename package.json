@@ -1,0 +1,18 @@
+{
+  "name": "scanandfind-lab",
+  "version": "1.0.0",
+  "description": "Educational eval lab for ScanAndFindIt interactive workshops — not production code",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wewesemsem/scanandfind-lab.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "population-eval": "node population-eval/run-population-eval.js",
+    "agent-eval": "node agent-routing-eval/run-agent-eval.js",
+    "agent-eval:verbose": "node agent-routing-eval/run-agent-eval.js --verbose"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

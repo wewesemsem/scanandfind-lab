@@ -1,0 +1,18 @@
+{
+  "cases": [
+    {
+      "id": "sdoh-001",
+      "description": "#10 SNAP and housing → SDOH tool",
+      "tags": ["sdoh", "tool-selection"],
+      "input": { "userText": "I need SNAP and housing help" },
+      "expected": { "tools": ["sdoh_navigator"], "forbidden": ["search_internet", "navigate_food_scan"] }
+    },
+    {
+      "id": "hall-route-map-no-location-001",
+      "description": "Generic diet question — no Healthy Map without location",
+      "tags": ["healthy-map", "hallucination"],
+      "input": { "userText": "what is a healthy diet for weight loss" },
+      "expected": { "forbidden_tools": ["healthy_map", "navigate_food_scan"] }
+    }
+  ]
+}

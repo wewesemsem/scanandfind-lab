@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "id": "nav-food-001",
+      "description": "#7 scan my lunch → food scanner",
+      "tags": ["routing", "food"],
+      "input": { "userText": "scan my lunch", "locale": "en" },
+      "expected": { "type": "navigate", "target": "scan", "scanTarget": "food" }
+    },
+    {
+      "id": "hall-route-food-safety-001",
+      "description": "#2 artificial food coloring — stay in chat",
+      "tags": ["hallucination", "routing"],
+      "input": { "userText": "is artificial food coloring safe for kids", "locale": "en" },
+      "expected": { "type": "none" }
+    },
+    {
+      "id": "regression-typo-001",
+      "description": "scam my food → food scanner (typo regression)",
+      "tags": ["routing", "regression"],
+      "input": { "userText": "scam my food", "locale": "en" },
+      "expected": { "type": "navigate", "target": "scan", "scanTarget": "food" }
+    }
+  ]
+}
