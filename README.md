@@ -16,6 +16,7 @@ No facilitator required. No private repo access. No API keys. Import this repo i
 6. [Integrity & wellness boundaries](#integrity--wellness-boundaries)
 7. [Self-debrief](#self-debrief)
 8. [Quick reference](#quick-reference)
+9. [Appendix — GCP, AWS & RAG](./APPENDIX.md) *(optional)*
 
 ---
 
@@ -309,6 +310,10 @@ npm run agent-eval -- --tags sdoh,healthy-map
 - **Agent** — `cases/*.json` defines expected outcomes; `router.js` implements simplified routing; `run-agent-eval.js` compares and exits non-zero on failure.
 
 CI runs the same commands on every push (`.github/workflows/evals.yml`).
+
+### Optional appendix
+
+For **future platform diagrams** (Google Cloud GKE vs AWS EKS) and how the assistant uses **retrieval-augmented generation** (ODPHP, MedlinePlus, tools, memories), see [APPENDIX.md](./APPENDIX.md).
 
 ### Ground rules
 
