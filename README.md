@@ -48,13 +48,13 @@ By the end you should be able to:
 
 **These are lab teaching evals, not the production deploy gate.**
 
-A full production backend runs 267+ automated agent cases, 1,000-person NHANES-like population evals, response-quality judges, and optional live staging checks. **This repo is a small, self-contained subset** so you can learn the ideas in one sitting.
+A full production backend runs 267+ automated agent cases, 1,000-person [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html)-like population evals, response-quality judges, and optional live staging checks. **This repo is a small, self-contained subset** so you can learn the ideas in one sitting.
 
 | | **This lab** | **Production backend** |
 |---|---|---|
 | **Purpose** | Learn by doing | CI deploy gate + regression safety |
 | **Dependencies** | None (plain Node.js) | Full agent stack, mocked LLM, 31 tools |
-| **Population eval** | 200 seeded synthetic adults | 1,000 NHANES-like profiles |
+| **Population eval** | 200 seeded synthetic adults | 1,000 [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html)-like profiles |
 | **Agent cases** | 5 hand-picked scenarios | 166+ routing cases + judges |
 | **Connection** | Runs entirely in this repo | Blocks deploy on failure |
 
@@ -222,7 +222,7 @@ Guideline reference: [Dietary Guidelines for Americans](https://www.dietaryguide
 The app calculates **DGA-based calorie targets** from profile data (height, weight, age, activity). Production uses two eval layers:
 
 1. **Hand-curated personas** — edge cases (high BMI, pregnancy, etc.).
-2. **NHANES-like cohort** — demographics sampled from *published* CDC summary statistics (not real people). A fixed random seed makes runs reproducible.
+2. **[NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html)-like cohort** — demographics sampled from published CDC summary statistics (not real people). A fixed random seed makes runs reproducible.
 
 This lab checks:
 
@@ -358,7 +358,7 @@ Integrity here means **consistency between what you promise and what the system 
 
 | Topic | Product stance | How evals / design support it |
 |-------|----------------|-------------------------------|
-| **Algorithmic bias** | Goal math uses published DGA + NHANES *summary* stats | Population eval catches systematic drift |
+| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches systematic drift |
 | **Wellness vs clinical** | General education — not diagnosis or prescription | Disclaimers, no diagnostic phrasing in guards |
 | **FDA** | General wellness scope — not a regulated device | No “FDA approved” claims; evals block them |
 | **Accessibility & i18n** | Multiple languages, accessible UI | Routing patterns must work across locales and typos |
