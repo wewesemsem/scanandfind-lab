@@ -18,6 +18,8 @@ No facilitator required. No private repo access. No API keys. Import this repo i
 8. [Quick reference](#quick-reference)
 9. [Appendix — GCP, AWS & RAG](./APPENDIX.md) *(optional)*
 
+*(Part 2 includes [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate).)*
+
 ---
 
 ## What you'll learn
@@ -313,7 +315,47 @@ Wellness assistants fail in predictable ways. Production teams lock these with a
 | **9** | Travel + calories + healthy food near hotel | Address all three goals |
 | **10** | “I need SNAP and housing help” | Route to **SDOH** resources — not random scan/search |
 
-Offline evals (like this lab) use **mocked** model replies so tests are fast and free. Live staging evals catch model drift — you don't need those to complete this lab.
+### Live evals — beyond the offline gate
+
+The **267 offline cases** (and the lab Replit stub) run **without** calling OpenAI or a deployed API. They mock the LLM, tool results, and citations so CI is fast, free, and deterministic. That catches routing regressions and **contracts** (“reply must not claim FDA approval”) — but it cannot catch **model drift** or end-to-end wiring bugs.
+
+**Live evals** close that gap. They are **never** in the user request path and **not** required for the lab Replit exercise.
+
+```mermaid
+flowchart LR
+  subgraph offline [Offline — deploy gate]
+    M[Mocked LLM + tools]
+    C[267 cases]
+    M --> C
+  end
+  subgraph live [Live — opt-in]
+    API[Real staging API]
+    OAI[Real OpenAI]
+    L12[12 chat SSE cases]
+    L3[3 semantic LLM cases]
+    API --> L12
+    OAI --> L3
+  end
+  offline -->|pass| Deploy[Ship]
+  live -->|weekly / manual| Drift[Catch drift]
+```
+
+| Layer | What runs | What it proves | In deploy gate? |
+|-------|-----------|----------------|----------------|
+| **Offline** (production `evals:agent-full`; **this lab stub**) | Mocked workflow + fixed or scripted replies | Routing, tools, skills, grounding **contracts** | **Yes** for production (267 cases); **this lab** is a small teaching subset |
+| **Live staging chat** | Real chat API on **staging** (auth, rate limits, workflow, OpenAI, database threads) | End-to-end **actions**, safety blocks, tool calls over the wire | **No** — weekly CI + manual (maintainers) |
+| **Live LLM response** | Real model replies + optional **semantic judge** | High-risk **wording** when mocks are not enough (e.g. overdose + driving, travel compound intent) | **No** — maintainer opt-in |
+
+**Examples of what offline vs live each catch:**
+
+| Failure mode | Offline / lab | Live |
+|--------------|---------------|------|
+| Food-coloring question opens scanner (#2) | ✓ contract check | ✓ same check on real API |
+| Reply minimizes overdose symptoms (#1) | Partial — often uses `mockReply` | ✓ real LLM + semantic judge |
+| Staging auth, SSE streaming, or thread persistence broken | ✗ | ✓ live chat evals |
+| Model or prompt drift after a release | ✗ | ✓ periodic staging runs |
+
+**Lab takeaway:** Passing the Replit / local agent eval teaches **routing contracts**. Production teams add live evals after prompt or model changes — same questions, real stack — but you do **not** need API keys or staging access to finish this lab.
 
 ### Hands-on — Agent routing eval
 
