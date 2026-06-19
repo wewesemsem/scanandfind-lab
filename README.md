@@ -120,6 +120,103 @@ flowchart LR
 | **Database** | Profiles, health events, goals, chat threads |
 | **External data** | USDA nutrition, FDA recalls, open food databases — live lookup |
 
+### Nutrition calculation equations
+
+The population eval uses **maintenance-mode** calorie targets from profile data (height, weight, age, sex, activity). These are **wellness estimates**, not medical advice. The lab implements the same core pipeline as production (`goalCalculator-lite.js`); the full app also supports lose/gain modes and pregnancy add-ons (see note at end).
+
+**Pipeline (order of operations):**
+
+```
+1. BMI → 2. Effective body weight for BMR → 3. Mifflin–St Jeor BMR
+→ 4. × activity multiplier → 5. Apply calorie floors / eval ceiling
+→ 6. Compare to DGA reference band
+```
+
+#### Step 1 — Body mass index (BMI)
+
+```
+BMI = weight_kg / (height_m)²
+```
+
+#### Step 2 — Adjusted body weight (when BMI ≥ 30)
+
+At higher BMI, using full body weight in predictive equations often **over-estimates** resting needs. For BMR only, we use **adjusted body weight** (Hamwi ideal body weight + 25% of excess):
+
+```
+inches_over_5ft = max(0, height_inches − 60)
+
+IBW_female = 45.5 + 2.3 × inches_over_5ft   (kg)
+IBW_male   = 50   + 2.3 × inches_over_5ft   (kg)
+
+effective_weight = IBW + 0.25 × (actual_weight_kg − IBW)
+```
+
+If BMI &lt; 30, `effective_weight = actual_weight_kg`. Protein targets in production still use actual weight; the lab stub focuses on calories.
+
+#### Step 3 — Basal metabolic rate (BMR) — Mifflin–St Jeor
+
+```
+base = 10 × effective_weight_kg + 6.25 × height_cm − 5 × age_years
+
+BMR_female = base − 161
+BMR_male   = base + 5
+```
+
+For nonbinary / other / prefer-not-to-say profiles, the lab averages the male and female BMR branches (production uses the same pattern).
+
+#### Step 4 — Maintenance calories (total daily energy estimate)
+
+```
+maintenance_kcal = round(BMR × activity_multiplier)
+```
+
+| Activity level | Multiplier | Typical meaning |
+|----------------|------------|-----------------|
+| `sedentary` | 1.2 | Little or no exercise |
+| `lightly_active` | 1.375 | Light exercise 1–3 days/week |
+| `moderately_active` | 1.55 | Moderate exercise 3–5 days/week |
+| `very_active` | 1.725 | Hard exercise 6–7 days/week |
+
+#### Step 5 — Safety floors and eval ceiling
+
+```
+calories_kcal = max(maintenance_kcal, minimum_floor)
+calories_kcal = min(calories_kcal, 4500)   # population eval absolute max
+```
+
+| Sex basis | Minimum kcal/day |
+|-----------|------------------|
+| Female | 1,200 |
+| Male / other | 1,500 |
+
+#### Step 6 — DGA plausibility band (what the eval checks)
+
+Computed calories are compared to **[DGA 2020–2025](https://www.dietaryguidelines.gov/)** estimated calorie needs by age, sex, and activity (`dgaReference-lite.js`). For each profile:
+
+```
+midpoint = (DGA_band_low + DGA_band_high) / 2
+tolerance = max(35% × midpoint, 450 kcal)
+
+PASS if |computed_kcal − midpoint| ≤ tolerance
+```
+
+The population eval requires **≥ 85%** of synthetic adults to pass this check (plus all profiles computing and staying within floors/ceiling).
+
+<details>
+<summary><strong>Production app — additional adjustments</strong> (not in this lab stub)</summary>
+
+| Feature | Formula / value |
+|---------|-----------------|
+| **Lose weight** | maintenance − **500** kcal/day |
+| **Gain weight** | maintenance + **300** kcal/day |
+| **Pregnancy T2 / T3 / lactating** | +340 / +452 / +330 kcal/day (goal offset skipped) |
+| **Added sugars limit** | &lt;10% of calories ÷ 4 kcal/g |
+| **Saturated fat limit** | &lt;10% of calories ÷ 9 kcal/g |
+| **Protein floor** | 0.8 g/kg actual weight (1.1 g/kg if age ≥ 60 or pregnant) |
+
+Guideline reference: [Dietary Guidelines for Americans](https://www.dietaryguidelines.gov/).
+</details>
+
 ### Hands-on — Population nutrition eval
 
 The app calculates **DGA-based calorie targets** from profile data (height, weight, age, activity). Production uses two eval layers:
