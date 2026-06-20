@@ -330,7 +330,7 @@ Eval strategy already separates **routing** (deterministic) from **response qual
 
 ## F. Eval sandbox on Kubernetes (why it appears in both diagrams)
 
-The **eval-sandbox** namespace runs automated agent and population checks in CI — warm pools for regression, **not** user traffic. Same eval ideas you practiced in this lab (routing contracts, DGA bands, grounding guards) scale to hundreds of cases before deploy. The lab stub teaches the pattern; production runs the full suite.
+The **eval-sandbox** namespace runs automated agent and population checks in CI — warm pools for regression, **not** user traffic. Same eval ideas you practiced in this lab (routing contracts, DGA plausibility bands, grounding guards) scale to hundreds of cases before deploy in a full product stack. The lab stub teaches the pattern; an example production monorepo runs the full suite.
 
 ---
 
@@ -403,7 +403,7 @@ See §A–C above. Pick **one** hyperscaler (GKE + BigQuery **or** EKS + Athena/
 
 | Direction | Notes |
 |-----------|-------|
-| **267-case offline gate** | Shipped — deterministic contracts block deploy |
+| **267-case offline gate** | Shipped in example production stack — deterministic contracts block deploy |
 | **Live staging chat evals** | Shipped — weekly; real SSE/auth/threads |
 | **Semantic judge** | Opt-in — separate model scores rubric; not default PR CI |
 | **Eval sandbox on GKE/EKS** | Planned — warm pool namespace for full suite |
