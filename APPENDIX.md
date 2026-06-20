@@ -3,7 +3,7 @@
 Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today.
 
 **Today (MVP):** Expo clients → Node API on managed PaaS → Supabase → OpenAI + Google Vision.  
-**Future:** Same app logic on **GKE** (Google Cloud) or **EKS** (AWS), with async workers, CDN/WAF, and an analytics warehouse.
+**Future:** Same app logic on **GKE** (Google Cloud) or **EKS** (AWS), with async workers, CDN/WAF, analytics warehouse, and **eval automation** in CI + cluster sandbox.
 
 Pick **one** cloud for production — mixing GCP and AWS control planes adds operational cost. Supabase, OpenAI, and Google Vision stay external SaaS on either path.
 
@@ -331,6 +331,86 @@ Eval strategy already separates **routing** (deterministic) from **response qual
 ## F. Eval sandbox on Kubernetes (why it appears in both diagrams)
 
 The **eval-sandbox** namespace runs automated agent and population checks in CI — warm pools for regression, **not** user traffic. Same eval ideas you practiced in this lab (routing contracts, DGA bands, grounding guards) scale to hundreds of cases before deploy. The lab stub teaches the pattern; production runs the full suite.
+
+---
+
+## G. CI automation — GitHub Actions (and Terraform note)
+
+Evals are wired into **GitHub Actions** so the same checks run locally and in CI.
+
+### G.1 This lab repo
+
+| Workflow | Trigger | What runs |
+|----------|---------|-----------|
+| `.github/workflows/evals.yml` | Push / PR to `main` | `npm run population-eval` + `npm run agent-eval` |
+
+Same commands you run in Replit — no API keys.
+
+### G.2 Production backend (conceptual — not in this repo)
+
+| Workflow | Role |
+|----------|------|
+| Math / population evals | Nutrition cohort + persona checks on goal-calculator changes |
+| Agent evals | 166+ routing and response-quality cases on agent/skills changes |
+| Nightly agent evals | Full suites; optional **semantic judge** (generator ≠ evaluator) |
+| Live staging evals | Weekly real API + OpenAI — catches drift mocks miss |
+| Production / release readiness | Full test + eval gate before deploy |
+
+Eval result artifacts upload to GitHub for review — pass rate is **not** a live production metric.
+
+### G.3 Terraform (future)
+
+**Today:** API on Heroku, web on Netlify, Supabase SaaS — **no Terraform in this lab**.
+
+**Phase 2–3 (planned):** Terraform provisions **GKE or EKS** (VPC, node pools, IAM), **eval-sandbox namespace**, event buses (Pub/Sub or SQS), CDN/WAF, and observability. Helm deploys the API; eval jobs run as CI-triggered workloads — **not** user traffic.
+
+| Layer | Purpose |
+|-------|---------|
+| **Terraform** | Clusters, networking, managed Prometheus/Grafana |
+| **Helm** | API, workers, eval-sandbox |
+| **GitHub Actions** | Build → test → eval → deploy |
+
+You do **not** need cloud accounts for this lab; this documents **where automation goes** when the platform scales off PaaS.
+
+---
+
+## H. Managed services — today vs future (evals & platform)
+
+### H.1 MVP today
+
+| Service | Role |
+|---------|------|
+| **Heroku** | Node API |
+| **Netlify** | Expo web static |
+| **Supabase** | Postgres, Auth, RLS |
+| **OpenAI** | Assistant **generator** + optional **evaluator** judge |
+| **Google Vision** | Scan labels, OCR, safe-search |
+| **GitHub Actions** | CI evals (this repo + production monorepo) |
+
+Evals run on **GitHub-hosted runners** — not on user request paths.
+
+### H.2 Future platform options
+
+See §A–C above. Pick **one** hyperscaler (GKE + BigQuery **or** EKS + Athena/Glue).
+
+| Option | When it fits |
+|--------|----------------|
+| **Stay on PaaS longer** | Small team — add logging, backups, async queues first |
+| **GKE + BigQuery** | Documented path; keep Google Vision; analytics R&D |
+| **EKS + Athena/Glue** | Team already on AWS; budget Vision migration or cross-cloud calls |
+
+### H.3 Future evals roadmap
+
+| Direction | Notes |
+|-----------|-------|
+| **267-case offline gate** | Shipped — deterministic contracts block deploy |
+| **Live staging chat evals** | Shipped — weekly; real SSE/auth/threads |
+| **Semantic judge** | Opt-in — separate model scores rubric; not default PR CI |
+| **Eval sandbox on GKE/EKS** | Planned — warm pool namespace for full suite |
+| **Semantic retrieval eval layer** | Roadmap — paraphrase recall across locales (pgvector / hybrid search) |
+| **Third-party eval platforms** | Optional — dashboards/rubrics; **assertions stay in-repo** for deploy gate |
+
+**Principle:** Managed services reduce ops toil; **eval contracts stay version-controlled** so releases cannot skip the same checks you ran in this lab.
 
 ---
 

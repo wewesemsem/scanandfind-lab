@@ -16,9 +16,9 @@ No facilitator required. No private repo access. No API keys. Import this repo i
 6. [Integrity & wellness boundaries](#integrity--wellness-boundaries)
 7. [Self-debrief](#self-debrief)
 8. [Quick reference](#quick-reference)
-9. [Appendix — GCP, AWS & RAG](./APPENDIX.md) *(optional)*
+9. [Appendix — GCP, AWS, RAG, CI & future platform](./APPENDIX.md) *(optional)*
 
-*(Part 2 includes [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate).)*
+*(Part 2 includes [Generator vs evaluator models](#generator-vs-evaluator-who-answers-vs-who-judges) and [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate).)*
 
 ---
 
@@ -271,6 +271,20 @@ flowchart TB
 
 **Takeaway:** Layer 0 (what you just ran) must pass before higher layers or research narratives are trustworthy.
 
+#### QUICK demo — explaining research results (≈ 60 sec)
+
+Use this when someone shows a cohort or “AI impact” slide — you will **not** run the full simulation in this lab.
+
+| Step | Say | Show |
+|------|-----|------|
+| **1** | “We model **1,000 synthetic adults** like NHANES summary stats — not real users, not a clinical trial.” | Layer 0 box |
+| **2** | “First, **≥ 85%** of calorie targets must land in Dietary Guidelines bands. You just ran that.” | Your population eval `PASS` line |
+| **3** | “Higher layers **simulate** behavior and a wellness index under two **what-if scenarios**: with vs without AI coaching.” | Simple S0 vs S2 chart |
+| **4** | “This is **scenario forecasting** with stated assumptions — not proof the app caused outcomes.” | Label: *Hypothetical · synthetic* |
+| **5** | “If Layer 0 fails, we don’t cite cohort results in demos or decks.” | Block L1–L3 when L0 fails |
+
+**Do not claim** “the app improves population health by X%” from simulation alone.
+
 ---
 
 ## Part 2 — Trust the Agent
@@ -356,6 +370,45 @@ flowchart LR
 | Model or prompt drift after a release | ✗ | ✓ periodic staging runs |
 
 **Lab takeaway:** Passing the Replit / local agent eval teaches **routing contracts**. Production teams add live evals after prompt or model changes — same questions, real stack — but you do **not** need API keys or staging access to finish this lab.
+
+### Generator vs evaluator — who answers vs who judges
+
+Production separates **three roles** — do not conflate “the AI” with “the eval”:
+
+| Role | What it does | Model / mechanism | In this lab? |
+|------|----------------|-------------------|--------------|
+| **Assistant (generator)** | User-facing chat/voice reply | OpenAI chat model in production | **No** — pattern matcher only |
+| **Offline eval assertions** | Routing, tools, grounding contracts | Deterministic rules + mocked replies | **Yes** — `agent-routing-eval/` |
+| **Semantic judge (evaluator)** | Scores wording against a rubric | **Separate LLM call** — never shown to users | **No** — maintainer opt-in |
+
+```mermaid
+flowchart LR
+  User[User question] --> Gen[Generator\nassistant reply]
+  Gen --> User
+  subgraph offline [Offline eval]
+    Mock[Mocked reply]
+    Assert[Deterministic checks]
+    Mock --> Assert
+  end
+  subgraph live [Live eval — opt-in]
+    Gen2[Generator\nreal reply]
+    Judge[Evaluator\nrubric pass/fail]
+    Gen2 --> Judge
+  end
+```
+
+1. **Offline gate (267 production cases)** — mostly **no OpenAI**; mocked workflow + fixed assertions for fast, reproducible CI.
+2. **Live response evals** — real **generator** stack, then optional **evaluator** judge for high-risk wording (e.g. overdose + driving).
+3. The judge **evaluates tone and safety phrasing**; it does not replace routing guards or citation checks.
+4. Default PR CI **skips** semantic judge checks (cost + non-determinism). Nightly maintainer runs may enable them.
+
+<details>
+<summary><strong>Check your understanding</strong></summary>
+
+**Q:** Why use a second model to judge the first?
+
+**A:** Routing can be correct while wording minimizes harm. A rubric-based judge catches **wording drift** that mocks cannot see.
+</details>
 
 ### Hands-on — Agent routing eval
 
@@ -452,7 +505,7 @@ CI runs the same commands on every push (`.github/workflows/evals.yml`).
 
 ### Optional appendix
 
-For **future platform diagrams** (Google Cloud GKE vs AWS EKS) and how the assistant uses **retrieval-augmented generation** (ODPHP, MedlinePlus, tools, memories), see [APPENDIX.md](./APPENDIX.md).
+For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation** (GitHub Actions, Terraform roadmap), **managed services today vs future**, and how the assistant uses **retrieval-augmented generation** (ODPHP, MedlinePlus, tools, memories), see [APPENDIX.md](./APPENDIX.md).
 
 ### Ground rules
 
