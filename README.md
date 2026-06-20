@@ -504,9 +504,10 @@ Answer these in your own words (notes or discussion):
 ### Commands
 
 ```bash
+npm start
 npm run population-eval
 npm run agent-eval
-npm run agent-eval -- --verbose
+npm run agent-eval:verbose
 npm run agent-eval -- --tags sdoh,healthy-map
 ```
 

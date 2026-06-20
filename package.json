@@ -10,7 +10,8 @@
   "scripts": {
     "population-eval": "node population-eval/run-population-eval.js",
     "agent-eval": "node agent-routing-eval/run-agent-eval.js",
-    "agent-eval:verbose": "node agent-routing-eval/run-agent-eval.js --verbose"
+    "agent-eval:verbose": "node agent-routing-eval/run-agent-eval.js --verbose",
+    "start": "npm run population-eval"
   },
   "engines": {
     "node": ">=18"
