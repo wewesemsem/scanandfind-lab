@@ -16,7 +16,7 @@ No facilitator required. No private repo access. No API keys. Import this repo i
 6. [Integrity & wellness boundaries](#integrity--wellness-boundaries)
 7. [Self-debrief](#self-debrief)
 8. [Quick reference](#quick-reference)
-9. [Appendix — GCP, AWS, RAG, CI & future platform](./APPENDIX.md) *(optional)*
+9. [Appendix — GCP, AWS, RAG, CI, bias & future platform](./APPENDIX.md) *(optional)*
 
 *(Part 2 includes [Generator vs evaluator models](#generator-vs-evaluator-who-answers-vs-who-judges) and [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate).)*
 
@@ -467,7 +467,7 @@ Integrity here means **consistency between what you promise and what the system 
 
 | Topic | Product stance | How evals / design support it |
 |-------|----------------|-------------------------------|
-| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches systematic drift at cohort scale (plausibility, not clinical validation) |
+| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches systematic drift at cohort scale (plausibility, not clinical validation); routing covers six locales — **[Appendix §I](./APPENDIX.md#i-algorithmic-bias--mitigation--lab-connection)** |
 | **Wellness vs clinical** | General education — not diagnosis or prescription | Disclaimers, no diagnostic phrasing in guards |
 | **FDA** | General wellness scope — not a regulated device | No “FDA approved” claims; evals block them |
 | **Accessibility & i18n** | Multiple languages, accessible UI | Routing patterns must work across locales and typos |
@@ -520,7 +520,7 @@ CI runs the same commands on every push (`.github/workflows/evals.yml`).
 
 ### Optional appendix
 
-For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation** (GitHub Actions, Terraform roadmap), **managed services today vs future**, and how the assistant uses **retrieval-augmented generation** (ODPHP, MedlinePlus, tools, memories), see [APPENDIX.md](./APPENDIX.md).
+For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation** (GitHub Actions, Terraform roadmap), **managed services today vs future**, how the assistant uses **retrieval-augmented generation** (ODPHP, MedlinePlus, tools, memories), and **algorithmic bias** mitigation, see [APPENDIX.md](./APPENDIX.md) (§I for bias).
 
 ### Ground rules
 

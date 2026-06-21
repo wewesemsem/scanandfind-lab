@@ -1,6 +1,6 @@
 # Appendix — Reference architecture & RAG
 
-Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today.
+Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today. **§I** covers **algorithmic bias** mitigation and how the lab exercises connect to it.
 
 **Today (MVP):** Expo clients → Node API on managed PaaS → Supabase → OpenAI + Google Vision.  
 **Future:** Same app logic on **GKE** (Google Cloud) or **EKS** (AWS), with async workers, CDN/WAF, analytics warehouse, and **eval automation** in CI + cluster sandbox.
@@ -411,6 +411,144 @@ See §A–C above. Pick **one** hyperscaler (GKE + BigQuery **or** EKS + Athena/
 | **Third-party eval platforms** | Optional — dashboards/rubrics; **assertions stay in-repo** for deploy gate |
 
 **Principle:** Managed services reduce ops toil; **eval contracts stay version-controlled** so releases cannot skip the same checks you ran in this lab.
+
+---
+
+## I. Algorithmic bias — mitigation & lab connection
+
+Optional depth after [Integrity & wellness boundaries](./README.md#integrity--wellness-boundaries) in the main README.
+
+**One-line framing:** Bias mitigation here is mostly **transparent rules + representative testing + integrity guardrails**, not “we trained on diverse data so the model is fair.” Synthetic cohort data is a **test harness** for population plausibility, not training data that debiases an ML model.
+
+### I.1 Two surfaces where bias can appear
+
+| Surface | Mechanism | Primary bias risk |
+|---------|-----------|-------------------|
+| **Nutrition goal math** | Deterministic formulas (BMI → BMR → activity → DGA bands) | Systematic over/under-estimation for body types, life stages, or activity levels the formulas handle poorly |
+| **In-app AI assistant** | LLM replies + routing/tools/skills across 6 locales | Wrong tool for a locale or phrasing; authoritative tone; clinical overreach; training-data skew in the foundation model |
+
+```mermaid
+flowchart TB
+  subgraph math [Nutrition goals — deterministic]
+    DGA[Published DGA + Mifflin–St Jeor]
+    Pop[Population eval — synthetic cohort]
+    DGA --> Pop
+  end
+  subgraph agent [AI assistant — hybrid]
+    Route[Routing + safety guards]
+    I18n[6-locale patterns + disclaimer keys]
+    Ground[Citations + wellness framing]
+    Judge[Optional semantic judge — live only]
+    Route --> I18n --> Ground --> Judge
+  end
+```
+
+### I.2 Where bias can enter (even with good intentions)
+
+| Source | Example | Why it matters at scale |
+|--------|---------|---------------------------|
+| **Formula defaults** | Default activity = sedentary when unknown | Conservative for intake, but may feel “punishing” vs over-estimating |
+| **Sex/gender buckets in BMR** | Male/female/other floors and offsets | Simplified physiology; must not encode stigma or exclude nonbinary users from usable targets |
+| **High BMI handling** | Adjusted weight for BMR only | Corrects over-prediction; easy to mis-explain to users as judgment |
+| **English-first routing patterns** | Typo or dialect not in regex | Silent misroute — feels broken or discriminatory for non-English users |
+| **LLM training data** | Tone, cultural food norms, gendered health advice | Routing can pass while **wording** still harms or misleads |
+| **Device & literacy barriers** | Vision scan fails; voice not available | Benefits skew toward digitally fluent, sighted, high-bandwidth users |
+| **Research narrative** | Cohort simulation cited as “impact” | Overstates benefit for groups underrepresented in synthetic data |
+
+Report disparities with **structural context** (design, infrastructure, policy) — not as inherent group limitations.
+
+### I.3 Mitigations in place today
+
+#### Nutrition math
+
+| Mitigation | What it does |
+|------------|--------------|
+| **Published standards** | [DGA 2020–2025](https://www.dietaryguidelines.gov/) bands, Mifflin–St Jeor BMR, documented activity multipliers — not opaque ML on user behavior |
+| **Special populations** | Pregnancy/lactation add-ons, older-adult life stage (60+), BMI ≥ 30 adjusted weight for BMR, sex-specific calorie floors |
+| **Hand-curated personas** | Edge cases in population eval (high BMI, pregnancy, adolescents) — see `population-eval/synthetic-personas.json` |
+| **Population eval** | NHANES-*like* synthetic adults; **≥ 85%** within DGA band + safety floors/ceiling — catches **cohort-level drift** |
+| **No race-based targeting** | Product logic does not segment or treat users by race/ethnicity |
+
+#### AI assistant & product integrity
+
+| Mitigation | What it does |
+|------------|--------------|
+| **Offline routing evals** | Example production stacks use hundreds of cases; this lab stub teaches the same **contract** idea — binary pass per scenario |
+| **Locale coverage** | Routing regression and disclaimer keys for **EN, ES, AR, ZH, HI, SW** |
+| **Negative guards** | e.g. food-safety questions stay in chat — do not open scanner ([Top 10 #2](./README.md#part-2--trust-the-agent)) |
+| **Hallucination / grounding cases** | No diagnosis, no FDA approval claims, no invented profile or intake data |
+| **Mandatory citations** | ODPHP / MedlinePlus for educational replies — reduces invented “facts” |
+| **Live + semantic judge (opt-in)** | Second model scores high-risk **wording** (overdose + driving, travel compound) when mocks are not enough |
+| **Inclusive gender options** | Profile supports diverse gender identity; math uses documented buckets with explicit floors |
+| **ADA-oriented UX** | WCAG labels, focus, large text (ongoing product work) |
+
+### I.4 Role of data — test harness, not debiasing training
+
+Participants often ask: *“Do we use data to reduce bias?”* Be precise:
+
+| Use of data | Role | In this lab? |
+|-------------|------|--------------|
+| **NHANES-like synthetic cohort** | Sample demographics from published CDC **summary statistics**; run calorie math at scale | **Yes** — `population-eval/` |
+| **Fixed random seed** | Reproducible cohort between runs | **Yes** — change `SEED` in [Part 1 exercise](./README.md#part-1--trust-the-math) |
+| **Hand-curated personas** | Named edge cases the sampler might under-represent | **Yes** — `short_heavy_female_moderate` task |
+| **User production data for ML training** | **Not used** for routing or calorie formulas in this product model | **No** |
+| **Stratified equity analysis** | Compare adherence, scan success, burden by age/gender/locale | **Research / future** — optional survey layer |
+
+**Synthetic cohort caveat:** Marginal sampling from published stats does **not** preserve full covariance (region, socioeconomic links, rare subgroups). Fine for **workshop plausibility**; not enough for research claims about real populations.
+
+### I.5 Eval & guardrail map (quick reference)
+
+| Bias-adjacent failure | Product stance | Eval / guardrail |
+|-----------------------|----------------|------------------|
+| Calorie targets drift low/high for many profiles | Wellness estimates from DGA pipeline | Population eval ≥ 85% in band; persona JSON |
+| Wrong scanner by locale or typo | Same server `action` contract on all clients | Routing cases per locale; typo cases (e.g. “scam my food”) |
+| Assistant implies diagnosis or FDA approval | General wellness only | Hallucination guards; disclaimers |
+| Invented user data | Use only profile fields on file | Factual-grounding cases |
+| Harmful safety wording | Urgent help; no minimizing overdose | Safety + response-quality cases |
+| Non-English disclaimer gaps | Same legal meaning in 6 locales | Locale compliance tests |
+| SDOH routed to wrong tool | Benefits programs ≠ camera “snap” | SDOH routing cases + benefits-program guards |
+
+### I.6 What passing does **not** prove
+
+| Claim | Verdict |
+|-------|---------|
+| “Fair outcomes for all demographic groups” | **Not proven** by Layer 0 alone |
+| “Clinically correct for any individual” | **Not proven** — plausibility only |
+| “LLM replies are unbiased in tone and culture” | **Not fully proven** — offline contracts + optional judge reduce risk |
+| “Synthetic cohort predicts real-world NHANES” | **Not claimed** — summary-stat sampling ≠ full survey covariance |
+| “No digital divide” | **Not measured** in lab — device, bandwidth, literacy still matter |
+
+**Integrity hook:** If population Layer 0 fails, do **not** cite simulated Layer 1–3 “AI impact” cohort charts in decks or demos ([Research layers](./README.md#research-layers-context-only)).
+
+### I.7 Gaps & honest scope
+
+| Gap | Direction |
+|-----|-----------|
+| LLM tone bias by gender or culture | Stratified audits; expand live semantic judge coverage |
+| Locale regex holes | Add regression eval per new variant when bugs are found |
+| Older adults / low vision | Simplified flows, voice (planned); stratify scan success by age in research |
+| Equity of API cost / device burden | Analyze by region and device tier in research design |
+| Formal legal sign-off on algorithmic bias | Product compliance milestone |
+
+### I.8 Lab exercises that touch bias
+
+| Lab moment | Bias lesson |
+|------------|-------------|
+| [Part 1 — population eval](./README.md#part-1--trust-the-math) | Representative **testing** catches systematic math drift; BMI-adjusted weight persona |
+| [Part 2 — agent eval](./README.md#part-2--trust-the-agent) | “Helpful” wrong action (scanner vs chat; SDOH vs snap) is an integrity/bias failure |
+| [Top 10 impact table](./README.md#part-2--trust-the-agent) | Each row locks a failure mode that disproportionately breaks trust |
+| [Integrity section](./README.md#integrity--wellness-boundaries) | Connect product promise to automated proof |
+| [Self-debrief #3](./README.md#self-debrief) | One persona vs hundreds of synthetic profiles |
+
+### I.9 Reflect — facilitator-style prompts
+
+| Prompt | Expected direction |
+|--------|-------------------|
+| “Is NHANES-like data the same as training a fair ML model?” | **No** — it tests deterministic math across synthetic demographics |
+| “What does ≥ 85% in DGA band actually guarantee?” | Plausibility / regression safety — not fairness or clinical validity |
+| “Where could the assistant sound helpful but act out of integrity?” | Wrong tool, FDA implication, English-only routing, invented intake |
+| “What bias risk remains after all offline cases pass?” | Wording drift, locale gaps, digital divide, over-trusting authoritative tone |
+| “If Layer 0 fails, can we still show AI impact slides?” | **No** — Layer 0 blocks citing cohort simulation narratives |
 
 ---
 
