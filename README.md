@@ -30,7 +30,7 @@ By the end you should be able to:
 2. Read simplified **architecture** for a mobile wellness app and its AI assistant.
 3. **Run** population nutrition and agent routing evals yourself.
 4. Connect **integrity** (doing what you promise) to bias, FDA/wellness boundaries, and scale.
-5. Name **hidden risks** when a wellness platform serves millions of users.
+5. Name **hidden risks** when a wellness platform serves users at large scale.
 
 ---
 
@@ -42,7 +42,7 @@ By the end you should be able to:
 | **Time** | Part 1 ≈ 12 min · Part 2 ≈ 13 min · Self-debrief ≈ 5 min |
 | **Ground rules** | General wellness education only — not FDA-approved, not clinical advice. No real user data. |
 
-**Integrity in one sentence:** [Integrity](https://www.clrn.org/what-is-integrity-in-ethics/) means acting in line with your stated values. ScanAndFindIt positions itself as *general wellness education*; evals and disclaimers are how engineers **check** that alignment in code.
+**Integrity in one sentence:** [Integrity](https://www.clrn.org/what-is-integrity-in-ethics/) means acting in line with your stated values. ScanAndFindIt positions itself as *general wellness education*; evals and disclaimers are how engineers **verify** that alignment in code (alignment checks, not legal proof of compliance).
 
 ---
 
@@ -55,7 +55,7 @@ The table below describes an **example production architecture** (maintainers' p
 | | **This lab** | **Example production backend** *(not in this repo)* |
 |---|---|---|
 | **Purpose** | Learn by doing | CI deploy gate + regression safety |
-| **Dependencies** | None (plain Node.js) | Full agent stack, mocked LLM, 31 tools |
+| **Dependencies** | None (plain Node.js) | Full agent stack, mocked LLM, 32 tools |
 | **Population eval** | 200 seeded synthetic adults | 1,000 [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html)-like profiles |
 | **Agent cases** | 5 hand-picked scenarios | 166+ routing cases + judges (267-case deploy gate) |
 | **Connection** | Runs entirely in this repo | Blocks deploy on failure |
@@ -74,14 +74,14 @@ An **eval** is a **repeatable, automated check** that scores system behavior aga
 |---|-----------|------|
 | **Scope** | One function, fixed input | System behavior + population plausibility |
 | **Data** | Fixed fixtures | Synthetic personas + statistical cohorts |
-| **Question** | “Does this formula return X?” | “Would this mislead users at scale?” |
+| **Question** | “Does this formula return X?” | “Does system behavior stay acceptable at scale?” (one common goal: catch patterns that would mislead users if they shipped) |
 
 **Why it matters for nutrition goals**
 
 | Goal | How evals help |
 |------|----------------|
-| **Population-level plausibility** | Thousands of synthetic adults — most calorie targets land in Dietary Guidelines (DGA) reference bands |
-| **Regression safety** | Catch systematic over/under-estimation or catastrophic drift before it hits millions of goal screens |
+| **Population-level plausibility** | Thousands of synthetic adults — most calorie targets land in **DGA-derived reference calorie ranges** from [DGA 2020–2025](https://www.dietaryguidelines.gov/) (age, sex, activity — not individualized clinical prescriptions) |
+| **Regression safety** | Catch systematic over/under-estimation or catastrophic drift before it reaches large numbers of goal screens |
 | **Compliance** | Math stays in *general wellness* range — not clinical dosing |
 
 **What passing these evals does — and does not — mean**
@@ -92,7 +92,7 @@ An **eval** is a **repeatable, automated check** that scores system behavior aga
 | The algorithm has not drifted catastrophically across a synthetic cohort | Superiority to other nutrition methods |
 | Contracts and routing behave consistently (agent evals) | That synthetic cohort results predict real-world outcomes |
 
-> **Population nutrition evals are sanity checks at scale — not scientific validation.** Matching DGA bands shows population-level plausibility, not that the algorithm is clinically correct.
+> **Population nutrition evals are sanity checks at scale — not scientific validation.** Landing in **DGA-derived reference calorie ranges** shows population-level plausibility, not that the algorithm is clinically correct for any individual.
 
 <details>
 <summary><strong>Check your understanding</strong> — click to reveal answer</summary>
@@ -152,7 +152,7 @@ BMI = weight_kg / (height_m)²
 
 #### Step 2 — Adjusted body weight (when BMI ≥ 30)
 
-At higher BMI, using full body weight in predictive equations often **over-estimates** resting needs. For BMR only, we use **adjusted body weight** (Hamwi ideal body weight + 25% of excess):
+In **this educational model**, at BMI ≥ 30 we use **adjusted body weight** for BMR because **some nutrition practitioners** apply it to reduce overestimation in certain predictive equations — **not because there’s universal consensus** (Hamwi ideal body weight + 25% of excess):
 
 ```
 inches_over_5ft = max(0, height_inches − 60)
@@ -163,7 +163,7 @@ IBW_male   = 50   + 2.3 × inches_over_5ft   (kg)
 effective_weight = IBW + 0.25 × (actual_weight_kg − IBW)
 ```
 
-If BMI &lt; 30, `effective_weight = actual_weight_kg`. Protein targets in production still use actual weight; the lab stub focuses on calories.
+If BMI &lt; 30, `effective_weight = actual_weight_kg`. Protein targets here still use actual body weight, which **many** frameworks do, though practices vary by setting and population; the lab stub focuses on calories.
 
 #### Step 3 — Basal metabolic rate (BMR) — Mifflin–St Jeor
 
@@ -203,7 +203,7 @@ calories_kcal = min(calories_kcal, 4500)   # population eval absolute max
 
 #### Step 6 — DGA plausibility band (what the eval checks)
 
-Computed calories are compared to **[DGA 2020–2025](https://www.dietaryguidelines.gov/)** estimated calorie needs by age, sex, and activity (`dgaReference-lite.js`). For each profile:
+Computed calories are compared to **DGA-derived reference calorie ranges** from **[DGA 2020–2025](https://www.dietaryguidelines.gov/)** by age, sex, and activity (`dgaReference-lite.js`). For each profile:
 
 ```
 midpoint = (DGA_band_low + DGA_band_high) / 2
@@ -212,9 +212,9 @@ tolerance = max(35% × midpoint, 450 kcal)
 PASS if |computed_kcal − midpoint| ≤ tolerance
 ```
 
-The population eval requires **≥ 85%** of synthetic adults to pass this check (plus all profiles computing and staying within floors/ceiling).
+The population eval requires **≥ 85%** of synthetic adults to pass this check (plus all profiles computing and staying within floors/ceiling). That **≥ 85%** threshold is an **engineering regression gate** (±35% band tolerance, minimum ±450 kcal) — chosen to catch cohort-level drift without demanding perfection on every synthetic profile.
 
-This threshold is a **population-level plausibility check**, not proof of nutritional accuracy for any individual user.
+This threshold is a **population-level plausibility check**, not establishment of nutritional accuracy for any individual user.
 
 <details>
 <summary><strong>Production app — additional adjustments</strong> (not in this lab stub)</summary>
@@ -236,7 +236,7 @@ Guideline reference: [Dietary Guidelines for Americans](https://www.dietaryguide
 The app calculates **DGA-based calorie targets** from profile data (height, weight, age, activity). Production uses two eval layers:
 
 1. **Hand-curated personas** — edge cases (high BMI, pregnancy, etc.).
-2. **[NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html)-like cohort** — demographics sampled from published CDC **summary statistics** (not real participant rows). A fixed random seed makes runs reproducible.
+2. **[NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html)-like cohort** — synthetic adults generated from distributions derived from published CDC **summary statistics** (not real participant rows). **These NHANES-derived synthetic profiles are not population-representative research samples.** A fixed random seed makes runs reproducible.
 
 > **Synthetic cohort caveat:** Sampling from published marginals (age, sex, BMI, activity) does **not** preserve full covariance — regional effects, socioeconomic relationships, and rare subgroups may be underrepresented. That is acceptable for a workshop plausibility check; it would **not** support research claims about real populations.
 
@@ -244,7 +244,7 @@ This lab checks:
 
 - Every profile computes successfully
 - Calories within safety floors (1,200 F / 1,500 M) and ceiling (4,500)
-- **≥ 85%** within a DGA reference band (±35%, minimum ±450 kcal)
+- **≥ 85%** within **DGA-derived reference calorie ranges** (±35%, minimum ±450 kcal) — **engineering regression gate**, not clinical validation
 
 This is a **population-level plausibility check** for wellness timelines — not a clinical trial, not evidence of real-world outcomes.
 
@@ -265,8 +265,8 @@ npm run population-eval
 <summary><strong>Answers</strong></summary>
 
 1. You should see something like `200/200 (100.0%)` and `PASS`.
-2. The % should stay **similar** (high-80s or better) — same statistical distribution, different individuals. Large swings would suggest a broken sampler or band logic.
-3. At BMI ≥ 30, using raw body weight in the Mifflin–St Jeor formula can **over-estimate** calorie needs. Adjusted body weight (ideal weight + fraction of excess) is a common approach to avoid unrealistic targets for heavier users.
+2. The % should stay **within a few percentage points** (high-80s or better) — same statistical distribution, different individuals. Large swings would suggest a broken sampler or band logic.
+3. At BMI ≥ 30, using raw body weight in the Mifflin–St Jeor formula can **over-estimate** calorie needs. Adjusted body weight is **one approach some practitioners use** — not universal consensus.
 </details>
 
 ### Research layers (context only)
@@ -291,10 +291,10 @@ Use this when someone shows a cohort or “AI impact” slide — you will **not
 
 | Step | Say | Show |
 |------|-----|------|
-| **1** | “We model **1,000 synthetic adults** like NHANES summary stats — not real users, not a clinical trial.” | Layer 0 box |
-| **2** | “First, **≥ 85%** of calorie targets must land in Dietary Guidelines bands — a **plausibility check**, not clinical proof. You just ran that.” | Your population eval `PASS` line |
+| **1** | “We model **1,000 synthetic adults** from NHANES summary-stat distributions — **not population-representative research samples**, not real users, not a clinical trial.” | Layer 0 box |
+| **2** | “First, **≥ 85%** of calorie targets must land in **DGA-derived reference calorie ranges** — a **plausibility check**, not clinical validation. You just ran that.” | Your population eval `PASS` line |
 | **3** | “Higher layers **simulate** behavior and a wellness index under two **what-if scenarios**: with vs without AI coaching.” | Simple S0 vs S2 chart |
-| **4** | “This is **scenario forecasting** with stated assumptions — not proof the app caused outcomes.” | Label: *Hypothetical · synthetic* |
+| **4** | “This is **scenario forecasting** with stated assumptions — not **evidence** the app caused outcomes.” | Label: *Hypothetical · synthetic* |
 | **5** | “If Layer 0 fails, we don’t cite cohort results in demos or decks.” | Block L1–L3 when L0 fails |
 
 **Do not claim** “the app improves population health by X%” from simulation alone.
@@ -368,7 +368,7 @@ flowchart LR
   live -->|weekly / manual| Drift[Catch drift]
 ```
 
-| Layer | What runs | What it proves | In deploy gate? |
+| Layer | What runs | What it verifies | In deploy gate? |
 |-------|-----------|----------------|----------------|
 | **Offline** (production `evals:agent-full`; **this lab stub**) | Mocked workflow + fixed or scripted replies | Routing, tools, skills, grounding **contracts** | **Yes** for production (267 cases); **this lab** is a small teaching subset |
 | **Live staging chat** | Real chat API on **staging** (auth, rate limits, workflow, OpenAI, database threads) | End-to-end **actions**, safety blocks, tool calls over the wire | **No** — weekly CI + manual (maintainers) |
@@ -467,10 +467,11 @@ Integrity here means **consistency between what you promise and what the system 
 
 | Topic | Product stance | How evals / design support it |
 |-------|----------------|-------------------------------|
-| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches systematic drift at cohort scale (plausibility, not clinical validation); routing covers six locales — **[Appendix §I](./APPENDIX.md#i-algorithmic-bias--mitigation--lab-connection)** |
+| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches systematic drift at cohort scale (plausibility, not clinical validation); routing cases cover six locales — **[Appendix §I](./APPENDIX.md#i-algorithmic-bias--mitigation--lab-connection)** |
 | **Wellness vs clinical** | General education — not diagnosis or prescription | Disclaimers, no diagnostic phrasing in guards |
 | **FDA** | General wellness scope — not a regulated device | No “FDA approved” claims; evals block them |
-| **Accessibility & i18n** | Multiple languages, accessible UI | Routing patterns must work across locales and typos |
+| **Citations** | ODPHP / MedlinePlus for educational replies | Supports **traceability and grounding** — not a guarantee every statement is correct |
+| **Accessibility & i18n** | Multiple languages, accessible UI | **Locale compliance tests** check disclaimer and wellness-copy keys in six locales (EN, ES, AR, ZH, HI, SW) — not full jurisdiction-by-jurisdiction legal sign-off |
 | **Security** | Auth, rate limits, encrypted sensitive data | Safety evals block jailbreaks |
 
 <details>
@@ -525,7 +526,7 @@ For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation*
 ### Ground rules
 
 - General wellness education only — not FDA-approved, not clinical dosing.
-- Population evals check **plausibility at scale**, not medical correctness.
+- Population evals **verify plausibility at scale**, not medical correctness.
 - No production keys, no real user data.
 - Simplified code for learning; real products need fuller eval suites.
 
