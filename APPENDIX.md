@@ -1,6 +1,6 @@
 # Appendix — Reference architecture & RAG
 
-Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today. **§I** covers **algorithmic bias** mitigation and how the lab exercises connect to it.
+Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today. **§I** covers **algorithmic bias**; **§J** covers **platform evolution and microservices** — how eval contracts survive scale.
 
 **Today (MVP):** Expo clients → Node API on managed PaaS → Supabase → OpenAI + Google Vision.  
 **Future:** Same app logic on **GKE** (Google Cloud) or **EKS** (AWS), with async workers, CDN/WAF, analytics warehouse, and **eval automation** in CI + cluster sandbox.
@@ -549,6 +549,471 @@ Participants often ask: *“Do we use data to reduce bias?”* Be precise:
 | “Where could the assistant sound helpful but act out of integrity?” | Wrong tool, FDA implication, English-only routing, invented intake |
 | “What bias risk remains after all offline cases pass?” | Wording drift, locale gaps, digital divide, over-trusting authoritative tone |
 | “If Layer 0 fails, can we still show AI impact slides?” | **No** — Layer 0 blocks citing cohort simulation narratives |
+
+---
+
+## J. Platform evolution & microservices — lab connection
+
+**Ground rules (same as the lab):** ScanAndFindIt is *general wellness education*, not clinical advice. The product is **not FDA approved**. Evals verify alignment in code — they are not legal proof of compliance.
+
+**Honest status:** **Kubernetes and microservices are not in production today.** This section describes a **future target** when scale and metrics justify phased change — not what you run in Replit.
+
+**Related appendix sections:** [§A–C](./APPENDIX.md#a-future-target--google-cloud-gke) (future GKE/AWS architecture) · [§H](./APPENDIX.md#h-managed-services--today-vs-future-evals--platform) (managed services) · [§I.6](./APPENDIX.md#i6-what-passing-does-not-prove) (what evals do not prove)
+
+---
+
+### J.1 Why this matters after the lab
+
+The lab focuses on **evals and integrity** — population plausibility and agent routing contracts. At **large scale**, architecture choices affect whether those contracts stay trustworthy:
+
+- A vision spike on the food scanner should not slow down chat or goal math.
+- A bad assistant deploy should not take down barcode lookup.
+- Production **267 offline agent cases** and the **Layer 0 population gate** must still pass after every infrastructure change.
+
+This section explains **how the platform evolves in phases** — without a big-bang rewrite — and why that matters for the same integrity story you saw in the lab. See also [Lab vs production](./README.md#lab-vs-production).
+
+---
+
+### J.2 Today — one API, many features
+
+Right now, mobile and web talk to **one Node API** on managed hosting (Heroku). That API handles scanning, nutrition goals, the AI assistant, wearables, and more. User data lives in **Supabase** (Postgres + auth). Scan labels use **Google Vision**; the assistant uses **OpenAI**.
+
+```mermaid
+flowchart LR
+  subgraph you [What you use]
+    App[ScanAndFindIt app<br/>iOS · Android · Web]
+  end
+
+  subgraph today [Today — one API]
+    API[Single wellness API]
+  end
+
+  subgraph data [Your data]
+    SB[(Supabase)]
+  end
+
+  subgraph vendors [External services]
+    Vision[Label OCR]
+    LLM[AI assistant]
+    Public[USDA · openFDA · Open Food Facts]
+  end
+
+  App --> API
+  API --> SB
+  API --> Vision
+  API --> LLM
+  API --> Public
+```
+
+| What you experience | What runs behind it |
+| ------------------- | ------------------- |
+| Scan a barcode or label | Vision + public food/drug databases |
+| See calorie targets | DGA-based goal math (Layer 0 eval checks this) |
+| Chat with the wellness assistant | Safety gates → skills → tools → response (agent evals lock routing) |
+| Timeline and check-ins | Dated health events in Supabase |
+
+This is the **right shape for MVP** — one deployable API, strong module structure inside, eval gates in CI.
+
+---
+
+### J.3 The plan — evolve in slices (strangler fig)
+
+We follow an industry pattern called the **strangler fig**: new pieces grow around the old system; traffic moves **slice by slice**; obsolete parts are removed only when the replacement is proven.
+
+| Step | Plain-language meaning | ScanAndFindIt example |
+| ---- | ---------------------- | --------------------- |
+| **1. Understand today** | Map what exists | One API, many internal modules, one database |
+| **2. Tighten modules inside the monolith** | Clear boundaries before splitting | Contracts between scanning, goals, assistant |
+| **3. Separate database areas** | Logical ownership before physical split | Postgres *schemas* per domain (still one Supabase) |
+| **4. Define standalone services** | Container + deploy unit per slice | Scan service, assistant service, etc. |
+| **5. Deploy and validate (no user traffic)** | Ship the new service; run synthetic, shadow, and eval traffic only | [FTGO Step 3](https://microservices.io/refactoring/example-of-extracting-a-service.html): *“does not handle production traffic”* until proven |
+| **6. Route traffic gradually** | Canary paths to new service; rest stays on monolith | Users keep **the same app URL** |
+| **7. Remove old code** | Delete extracted routes from the monolith | Smaller core until fully modernized |
+
+**Methodology:** [FTGO extraction example](https://microservices.io/refactoring/example-of-extracting-a-service.html) (Food to Go). **Critical nuance:** deploy the standalone service first; **do not route live user traffic** until shadow/canary validation passes ([§J.8](#j8-shadow-canary-and-rollback-criteria)).
+
+---
+
+### J.4 Future shape — four core services (+ workers)
+
+When scale and metrics justify it, the **same app** will still call **one public API address**. Behind the load balancer, work splits by **cost and risk profile**:
+
+```mermaid
+flowchart TB
+  App[iOS / Android / Web<br/>unchanged URL]
+
+  subgraph edge [Edge]
+    CDN[CDN + WAF]
+    GW[Path routing<br/>same hostname]
+  end
+
+  subgraph services [Future services — not all live yet]
+    Scan[Scan service<br/>Vision · barcodes · openFDA]
+    Asst[Assistant service<br/>Chat · voice · safety]
+    Plat[Platform service<br/>Profile · timeline · goals]
+    Int[Integrations service<br/>Wearables · maps · news]
+  end
+
+  subgraph async [Background workers]
+    Q[Event bus<br/>Pub/Sub]
+    W[Rollups · alerts · sync]
+  end
+
+  App --> CDN --> GW
+  GW --> Scan & Asst & Plat & Int
+  Scan & Plat & Int -->|events| Q --> W
+```
+
+| Future service | What it owns (user-facing) | Why split it |
+| -------------- | -------------------------- | ------------ |
+| **Scan** | Food/plastic/drug/pet scans, nutrition lookup | Vision cost and burst traffic |
+| **Assistant** | Chat, voice, tool routing, thread history | LLM cost, long-lived connections, safety pipeline |
+| **Platform** | Profile, health timeline, goals, check-ins, account | Steady CRUD; single writer for timeline events |
+| **Integrations** | Wearables, weather, health news, maps | OAuth tokens, scheduled sync jobs |
+| **Social** (optional, later) | Teams, feed, wellness studio posts | Defer until v3 scale needs it |
+
+**Workers** (not user-facing HTTP) handle timeline rollups, recall alerts, and wearable sync — so heavy jobs do not block your scan or chat.
+
+---
+
+### J.5 Target microservices architecture (full diagram)
+
+**Future steady state** — not live today. Same app URL; path routing sends each request to the right service. Pairs with [§A.1](./APPENDIX.md#a1-target-diagram-phase-23) (cluster-level view).
+
+```mermaid
+flowchart TB
+  subgraph Clients [Clients]
+    App[iOS / Android / Web]
+  end
+
+  subgraph Edge [Edge]
+    CDN[Cloud CDN + WAF]
+    GW[API Gateway<br/>LB Path Routing]
+  end
+
+  subgraph Services [Microservices — GKE]
+    SCAN[scan-service]
+    ASST[assistant-service]
+    PLAT[platform-service]
+    INT[integrations-service]
+  end
+
+  subgraph OptionalV3 [Optional v3 — defer until scale]
+    SOC[social-service]
+  end
+
+  subgraph Async [Event Bus]
+    PS[Pub/Sub]
+    W1[worker-rollups]
+    W2[worker-alerts]
+    W3[worker-notifications]
+  end
+
+  subgraph Data [Data Plane]
+    SB[(Supabase Postgres<br/>Schema-per-service)]
+    Redis[(Redis — scan cache only<br/>ephemeral · HA optional)]
+    GCS[Cloud Storage — feed media]
+  end
+
+  subgraph External [External Systems]
+    OAI[OpenAI]
+    GV[Google Vision]
+    FDA[openFDA / OFF / USDA]
+    Wear[Wearables]
+  end
+
+  App --> CDN --> GW
+  GW --> SCAN & ASST & PLAT & INT
+  GW -.->|optional v3| SOC
+  SCAN --> GV & FDA
+  SCAN --> Redis
+  SCAN -->|events| PS
+  ASST --> OAI
+  ASST --> SB
+  PLAT --> SB
+  INT --> Wear & SB
+  SOC --> GCS & SB
+  PS --> W1 & W2 & W3
+  W1 & W2 & W3 --> SB
+  PLAT -->|events| PS
+  INT -->|events| PS
+```
+
+| Layer | What it is | You care because… |
+| ----- | ---------- | ----------------- |
+| **Clients** | Same app on iOS, Android, web | No new URL |
+| **Edge (CDN + WAF)** | Global cache + web application firewall | Protects assistant routes from abuse at scale |
+| **API Gateway** | One hostname; routes like `/api/food/*` → scan, `/api/chat/*` → assistant | Invisible to users; one API base URL |
+| **Microservices** | **Four core** deploy units (+ social optional v3) | Scan/assistant spikes don’t take down goals or timeline |
+| **Event bus (Pub/Sub)** | Durable pub/sub for domain events | Scan completes → timeline updates without blocking your request |
+| **Workers** | Background jobs (rollups, alerts, notifications) | Dashboards stay fast |
+| **Data plane** | Supabase (schema-per-service); **Redis for scan-result cache only** (ephemeral; loss degrades latency, not correctness); GCS for optional social media | Logical ownership per domain — see [§J.6](#j6-data-architecture--interim-vs-target) |
+| **Eval sandbox namespace** | Separate K8s namespace for CI golden queries | Full production gate runs warm; never shares live user traffic — see [§F](./APPENDIX.md#f-eval-sandbox-on-kubernetes-why-it-appears-in-both-diagrams) |
+
+**One-line summary:** *One front door for the app; four core kitchens behind it — social is optional later; an event bus for side effects; same Supabase and same eval gates.*
+
+---
+
+### J.6 Data architecture — interim vs target
+
+Schema-per-service on **one Supabase Postgres** is an **interim** pattern, not the final autonomy target.
+
+| Stage | Pattern | Consistency | When |
+| ----- | ------- | ------------- | ---- |
+| **Interim (Phase 0–2)** | Shared Postgres; logical schemas; monolith service role | Strong consistency inside the monolith | Now → first K8s lift + async workers |
+| **Mid (Phase 3–4)** | Schema-scoped DB credentials; **single writer** for timeline events (platform-service) | **Eventual** consistency across services via Pub/Sub | After first service extractions |
+| **Target (Phase 5+)** | Optional read replicas; BigQuery/Athena for analytics | OLTP stays Postgres; analytics decoupled | When scale and team justify it |
+
+**Transactional boundaries (not one ACID transaction after split):**
+
+| Flow | Pattern | Owner |
+| ---- | ------- | ----- |
+| Profile + onboarding | **Single transaction** | platform-service |
+| Scan → timeline | **Eventual** via `scan.completed` → platform consumer | scan publishes; platform writes events |
+| Goal recompute | **Eventual** via profile-updated event | platform-service |
+| OAuth token refresh | **Integrations-service only** | No cross-service token reads |
+
+**Distributed event patterns (required once async workers and splits are live):**
+
+| Pattern | Purpose |
+| ------- | ------- |
+| **Transactional outbox** | DB write and event emit succeed or fail together |
+| **Idempotency keys** | Prevent duplicate timeline rows on Pub/Sub retries |
+| **Dead-letter topic (DLQ)** | Poison messages do not block the bus; replay after fix |
+| **At-least-once delivery** | Consumers must be idempotent — assume duplicates |
+
+> **Coupling risk:** Shared Supabase still shares connection limits and migration blast radius. Schema-per-service is **ownership enforcement**, not full isolation, until credentials and write paths are scoped per domain.
+
+---
+
+### J.7 Phased timeline — when, not if-by-date
+
+Migration is **gated by metrics**, not a calendar mandate (e.g. scan latency spikes when chat is busy, or AI cost dominates infra spend).
+
+| Phase | What changes | User-visible impact |
+| ----- | ------------ | ------------------- |
+| **0 — Foundation** | Stronger module contracts; timeline events; wearable tokens in Postgres | **None** |
+| **1 — Container lift** | Same code on Kubernetes (GKE or EKS) with Helm | **None** — DNS/ops only |
+| **2 — Async workers** | Event bus (Pub/Sub) + background jobs | **None** — faster dashboards over time |
+| **3 — First splits** | Scan + assistant; **shadow/canary** before full routing ([§J.8](#j8-shadow-canary-and-rollback-criteria)) | **None** — same API URL |
+| **4 — Platform + integrations** | Remaining domains extracted | **None** |
+| **5 — Edge + optional social** | CDN/WAF hardening; social split if needed | **None** |
+
+```mermaid
+flowchart TB
+  A[Today<br/>One API on Heroku]
+  B[Modular monolith hardened<br/>Events · contracts]
+  C[Monolith on Kubernetes]
+  D[Monolith + Pub/Sub workers]
+  E[Scan + assistant services]
+  F[Platform + integrations]
+  G[Edge + optional social]
+
+  A --> B --> C --> D --> E --> F --> G
+```
+
+First service extractions are **earliest ~12–18 months** after foundation gates pass — subject to measurable scale triggers, not a fixed calendar.
+
+---
+
+### J.8 Shadow, canary, and rollback criteria
+
+Each phase follows [FTGO Step 3](https://microservices.io/refactoring/example-of-extracting-a-service.html): **deploy first, route user traffic only after validation**.
+
+| Phase | Shadow / canary approach | Rollback trigger | Rollback action |
+| ----- | ------------------------ | ---------------- | --------------- |
+| **0 — Foundation** | No traffic shift; CI contract tests | Layer 0 or agent eval failure | Block merge / deploy |
+| **1 — Container lift** | Blue/green K8s vs Heroku; latency parity tests | p99 latency > baseline +20%; error rate > 0.5% | DNS back to Heroku |
+| **2 — Async workers** | Dual-write events; shadow subscription first | Duplicate rollups; consumer lag > SLO; DLQ spike | Disable consumers; monolith fallback |
+| **3 — First splits** | Deploy with **zero user traffic**; canary **1% → 10% → 50% → 100%** | Agent eval failure; shadow diff on golden scans | Ingress **100% to monolith** |
+| **4 — Platform + integrations** | Per-service canary; DSAR/OAuth soak | DSAR or sync failures | Route paths back to core-api |
+| **5 — Edge + optional social** | CDN/WAF canary; social shadow traffic | Moderation SLA breach; WAF false positives | Revert rules; social to platform-service |
+
+**Every phase gate (before increasing traffic):**
+
+1. Offline agent eval suite passes (production: **267 cases**; lab teaches a subset — [Lab vs production](./README.md#lab-vs-production))
+2. **Layer 0 population eval** passes (≥ 85% DGA band)
+3. Shadow/canary metrics within SLO (error rate, latency, cost)
+4. Rollback runbook tested in staging
+
+---
+
+### J.9 What never changes
+
+| Commitment | Why it matters to the lab |
+| ---------- | ------------------------- |
+| **Same app API URL** | Client and eval configs stay stable |
+| **Agent routing eval gate, zero allowed failures** (production) | Routing and safety locks survive infra moves |
+| **Layer 0 population eval (≥ 85% DGA band)** | Goal math pipeline unchanged in meaning |
+| **General wellness framing; no FDA approval claims** | Disclaimers enforced in evals and copy |
+| **Six locales** (EN, ES, AR, ZH, HI, SW) | Locale compliance tests still apply |
+| **Supabase as primary user database** | No “migrate all user data day one” surprise |
+
+After any major deploy: re-run the same eval gates — infra changes can still introduce environment-specific behavior.
+
+---
+
+### J.10 What offline evals prove — and what they do **not**
+
+Production deploy blockers prove **code contracts**, not clinical outcomes or legal compliance. See [Live evals — beyond the offline gate](./README.md#live-evals--beyond-the-offline-gate) and [§I.6](./APPENDIX.md#i6-what-passing-does-not-prove).
+
+| Eval layer | What it runs | What passing **proves** | What passing does **not** prove |
+| ---------- | ------------ | ----------------------- | --------------------------------- |
+| **Layer 0 — population** | Deterministic goal math across synthetic demographics | DGA-band plausibility for the formula pipeline | Clinical correctness for any individual; fairness across all real-world groups |
+| **Offline agent cases** | Mocked LLM + tools; routing/grounding contracts | Tool routing, safety blocks, forbidden-claim **wording contracts** | Live OpenAI **wording drift**; end-to-end auth or network wiring |
+| **Forbidden-claim / locale tests** | Regex and copy rules in CI | No FDA-approval claims in tested strings; six-locale disclaimer patterns | Legal sign-off; WCAG audit of live UI; tone/cultural bias in LLM replies |
+| **Live staging evals** *(weekly / manual — not deploy gate)* | Real staging API + OpenAI | End-to-end action, streaming, safety over the wire | Not on every PR — drift can appear between runs |
+
+**Compliance boundary:**
+
+- Evals verify **alignment in code** — they are **not legal proof** of FDA, ADA, or privacy compliance.
+- Offline mocks **cannot** catch model drift, cross-service wiring bugs, or production IAM/network misconfiguration.
+- Live staging evals and periodic human review close part of that gap.
+
+---
+
+### J.11 Integrity & compliance at scale
+
+| Concern | How the plan protects users |
+| ------- | ---------------------------- |
+| **FDA / wellness copy** | Forbidden-claim evals on every release; [Integrity section](./README.md#integrity--wellness-boundaries) |
+| **Accessibility (ADA / WCAG)** | **Client UI** owns WCAG; API preserves response schemas and localized content |
+| **Security** | Every service validates the same Supabase JWT; scoped database access per domain |
+| **Privacy / DSAR** | Account deletion and export stay in platform service until redesigned |
+| **AI safety** | Assistant service isolates moderation and tool allowlists; evals lock worst-case routing |
+
+---
+
+### J.12 Production platform foundations
+
+These apply **before** service splits are production-ready. Cluster diagrams: [§A](./APPENDIX.md#a-future-target--google-cloud-gke) · [§B](./APPENDIX.md#b-future-target--aws-eks).
+
+#### Shared responsibility
+
+| Layer | **Cloud provider** owns | **Product team** owns |
+| ----- | ------------------------- | --------------------- |
+| Datacenter, managed K8s control plane | ✓ | |
+| VPC, firewall, NAT, load balancers (configuration) | Partial | ✓ configure |
+| Pod security — RBAC, network policy, secrets | | ✓ |
+| Application code, eval gates, wellness copy, JWT validation | | ✓ |
+| **Supabase** Postgres, Auth | Supabase ops | Schema, RLS, backup verification, DSAR |
+| **OpenAI / Google Vision** | Vendor | Prompts, safety gates, DPAs, key rotation |
+
+> **Today:** API on **Heroku PaaS** with env-var secrets — no self-managed VPC. Below describes the **target** after K8s lift (Phase 1+).
+
+#### IAM and secrets
+
+| Concern | Today (MVP) | Target (GKE / EKS) |
+| ------- | ----------- | ------------------- |
+| **Cloud IAM** | PaaS config vars | Per-workload service accounts — **Workload Identity** (GKE) or **IRSA** (EKS) |
+| **Secrets** | Heroku config | **Secret Manager** / **Secrets Manager** + External Secrets Operator |
+| **App auth** | Supabase JWT | Same JWT on **every** service |
+| **DB credentials** | Single service role | Schema-scoped credentials (Phase 3–4) |
+
+#### Networking, DR, and observability
+
+| Area | Target pattern |
+| ---- | -------------- |
+| **Networking** | Private subnets for cluster nodes; CDN + WAF at edge; NAT for vendor API egress |
+| **DR / backup** | Supabase PITR verified; Phase 5 multi-region cluster + DNS failover (RTO ~5–15 min target) |
+| **Observability** | Centralized logs; Prometheus + Grafana; distributed tracing; SLO alerts |
+| **Gap today** | Heroku logs + Sentry — no unified APM; Phase 1 milestone before K8s cutover |
+
+Async **Pub/Sub** workers can catch up after an outage without blocking the synchronous API ([§A.1](./APPENDIX.md#a1-target-diagram-phase-23)).
+
+---
+
+### J.13 GCP vs AWS
+
+**Pick one control plane** for operational simplicity. Full comparison: [§C](./APPENDIX.md#c-gcp-gke-vs-aws-eks--for-this-product).
+
+| | **GCP (GKE)** | **AWS (EKS)** |
+|---|---------------|---------------|
+| **Queue** | Pub/Sub | EventBridge / SQS |
+| **Analytics (R&D)** | BigQuery | Athena / Glue |
+| **Scan OCR today** | Google Vision (already used) | Cross-cloud Vision *or* Rekognition/Textract migration |
+| **Edge** | Cloud CDN + Cloud Armor | CloudFront + AWS WAF |
+
+Helm charts, eval suites, Supabase, and OpenAI are portable either way.
+
+---
+
+### J.14 Q&A and guardrails
+
+| Question | Short answer |
+| -------- | ------------ |
+| “Are you microservices today?” | **No.** One modular API on managed PaaS. |
+| “Will the app URL change?” | **No.** Path routing behind one hostname. |
+| “Does splitting break the lab evals?” | **It shouldn’t.** Same contracts — re-run gates after major moves. |
+| “Do offline evals prove FDA or clinical safety?” | **No.** Code contracts only — [§J.10](#j10-what-offline-evals-prove--and-what-they-do-not). |
+| “Why not split everything now?” | Operational cost; premature splits → *distributed monolith*. |
+| “What splits first?” | **Scan** (vision cost) and **assistant** (LLM cost and safety). |
+
+**Do say:** Phased evolution · same eval contracts · shadow/canary before traffic · K8s/microservices **planned, not live** · general wellness — not FDA approved.
+
+**Do not say:** Already on microservices/K8s · evals replace legal review · route traffic same day as deploy · each service gets its own database tomorrow · social splits first.
+
+**Optional host script (~2:00):**
+
+> You’ve seen how we **trust the math** and **trust the agent contracts** with evals. At scale, a food-scan spike shouldn’t slow your check-in, and a heavy chat day shouldn’t break barcode lookup. We’re **not** rewriting overnight — we’re **strangling** one slice at a time, **only when metrics prove we need to**. Your app keeps **one URL**. Kubernetes and separate services are **future** targets. What *is* live today: population checks, agent routing locks, and wellness-not-FDA posture in CI. **Scale the platform one phase at a time; never scale away the integrity gates.**
+
+---
+
+### J.15 One-page summary
+
+```mermaid
+flowchart LR
+  subgraph lab [What you did in the lab]
+    L0[Layer 0 — population plausibility]
+    Agent[Agent routing contracts]
+  end
+
+  subgraph today [Today]
+    Mono[One wellness API]
+  end
+
+  subgraph future [Future — gated by scale]
+    Svc[Scan · Assistant · Platform · Integrations]
+    EvalNS[Eval sandbox namespace]
+  end
+
+  lab -.->|same contracts| today
+  today -->|strangler phases| future
+  future -.->|eval gates| lab
+```
+
+| | Today | Future (when justified) |
+|---|-------|-------------------------|
+| **Deploy units** | 1 API | 4 core APIs + workers (+ optional social) |
+| **Hosting** | Heroku + Supabase | GKE or EKS + Supabase |
+| **User URL** | One API base | **Same** |
+| **Eval gates** | Layer 0 + agent routing | **Same** + re-run after moves |
+| **Platform ops** | Heroku logs + Sentry | VPC, IAM, DR, observability |
+| **Wellness posture** | Disclaimers, no FDA claims | **Unchanged** |
+
+---
+
+### J.16 AI workloads on Kubernetes *(optional — architects)*
+
+Modern platforms run **microservices and AI on the same operational plane**. [GKE AI/ML documentation](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/machine-learning) describes Kubernetes as a unified home for HTTP services, batch jobs, and (when justified) GPU inference.
+
+**Principle:** Treat AI as **another workload class** — different scheduling, cost, and security — not a separate island that bypasses platform standards.
+
+| Choice | When |
+| ------ | ---- |
+| **Managed APIs** (OpenAI, Vertex AI) | MVP, spiky traffic, limited MLOps depth — **ScanAndFindIt today** |
+| **Self-hosted on K8s** | Steady high QPS, strict data residency, token economics favor owned GPU |
+| **Hybrid** | Microservices on GKE/EKS; primary LLM via managed API; small GPU pool for embeddings or batch evals in **eval-sandbox** |
+
+**ScanAndFindIt today:** Managed OpenAI + Google Vision — appropriate for eval-gated assistant contracts. Revisit self-hosting only with measured token spend, latency SLOs, and compliance triggers.
+
+**Platform AI agents (internal ops):** Read-only cluster assist first; human approval for any write; audit every tool invocation; scrub secrets/PHI before LLM context.
+
+**Cost callout:** Idle GPUs dominate waste — monitor utilization before expanding self-hosted inference.
+
+---
+
+*§ J uses only public architecture concepts and educational stubs. It does not grant production access, cloud accounts, or legal advice.*
 
 ---
 
