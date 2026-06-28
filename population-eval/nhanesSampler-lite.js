@@ -2,6 +2,7 @@
  * Seeded synthetic adult profiles from published NHANES summary statistics.
  * No individual NHANES records — educational sampler for population evals.
  * @see https://www.cdc.gov/nchs/nhanes/about/index.html
+ * @see ../NOTICE
  */
 
 const NHANES_STATS = {

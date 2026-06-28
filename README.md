@@ -534,4 +534,4 @@ For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation*
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Third-party attributions: [NOTICE](NOTICE).

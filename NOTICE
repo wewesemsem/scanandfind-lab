@@ -1,0 +1,90 @@
+ScanAndFindIt Interactive Lab — Third-Party Notices
+====================================================
+
+This repository is licensed under the MIT License. See LICENSE for the full
+text. Copyright (c) 2026 ScanAndFindIt contributors.
+
+The following third-party and public-domain materials are incorporated or
+referenced in this project.
+
+-------------------------------------------------------------------------------
+
+1. Mulberry32 pseudo-random number generator
+   Used in: population-eval/nhanesSampler-lite.js (createSeededRandom)
+
+   Original algorithm by Tommy Ettinger (2017), dedicated to the public
+   domain (CC0 1.0) to the extent possible under law.
+
+   Reference:
+   https://gist.github.com/tommyettinger/46a874533244883189143505d203312c
+
+   The JavaScript implementation in this repo follows the widely circulated
+   port of that algorithm. No separate license applies beyond CC0/public
+   domain dedication of the original work.
+
+-------------------------------------------------------------------------------
+
+2. Dietary Guidelines for Americans (DGA) estimated calorie needs
+   Used in: population-eval/dgaReference-lite.js
+
+   Calorie bracket values are derived from published U.S. Dietary Guidelines
+   for Americans 2020–2025 (Appendix 2–style estimated calorie needs by age,
+   sex, and activity level).
+
+   Source: U.S. Department of Agriculture and U.S. Department of Health and
+   Human Services. Dietary Guidelines for Americans, 2020–2025.
+   https://www.dietaryguidelines.gov/
+
+   U.S. government works are generally not subject to copyright in the
+   United States. See 17 U.S.C. § 105.
+
+-------------------------------------------------------------------------------
+
+3. NHANES summary statistics
+   Used in: population-eval/nhanesSampler-lite.js (NHANES_STATS)
+
+   Height and weight means and standard deviations are taken from published
+   CDC NHANES summary statistics for synthetic profile generation. This lab
+   does not include or redistribute individual NHANES participant records.
+
+   Source: National Health and Nutrition Examination Survey (NHANES),
+   National Center for Health Statistics, Centers for Disease Control and
+   Prevention. https://www.cdc.gov/nchs/nhanes/
+
+   Verify the specific survey cycle and summary table against current CDC
+   publications before citing these values in research or external docs.
+
+-------------------------------------------------------------------------------
+
+4. Published nutrition and statistics formulas (standard references)
+   Used in: population-eval/goalCalculator-lite.js,
+            population-eval/nhanesSampler-lite.js
+
+   The following well-known, published formulas and methods are implemented
+   using their standard public coefficients and are not proprietary to this
+   repository:
+
+   - Mifflin–St Jeor basal metabolic rate equation
+     (Mifflin MD, St Jeor ST, et al. Am J Clin Nutr. 1990;51(2):241-247.)
+   - Hamwi ideal body weight method for adjusted body weight at BMI ≥ 30
+     (Hamwi GJ. Diabetes. 1964;6:29-31.)
+   - Activity multipliers commonly paired with BMR-based energy estimates
+   - Box–Muller transform for normal random sampling
+     (Box GEP, Muller ME. Ann Math Stat. 1958;29(2):610-611.)
+
+   These are standard clinical and statistical references; implementers should
+   cite the original publications when required by their context.
+
+-------------------------------------------------------------------------------
+
+5. Production codebase relationship
+
+   Several modules in this lab are simplified educational subsets inspired by
+   the ScanAndFindIt production application (e.g. goalCalculator-lite,
+   dgaReference-lite, agent-routing-eval/router.js). They are not copies of
+   the production deploy and are maintained separately in this repository.
+
+-------------------------------------------------------------------------------
+
+For questions about attribution or licensing, open an issue in the project
+repository: https://github.com/wewesemsem/scanandfind-lab

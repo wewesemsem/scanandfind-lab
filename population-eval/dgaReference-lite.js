@@ -1,6 +1,7 @@
 /**
  * DGA 2020–2025 estimated calorie needs (Appendix 2 style) for population plausibility.
  * Educational subset — see production test/evals/dgaCalorieReference.js for full tables.
+ * @see ../NOTICE
  */
 
 const ACTIVITY_LEVELS = ['sedentary', 'lightly_active', 'moderately_active', 'very_active'];

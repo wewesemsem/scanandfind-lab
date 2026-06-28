@@ -1,6 +1,6 @@
 # Appendix — Reference architecture & RAG
 
-Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today. **§I** covers **algorithmic bias**; **§J** covers **platform evolution and microservices** — how eval contracts survive scale.
+Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today. **§G** covers **CI and Terraform**; **§H** covers **managed services**; **§I** covers **algorithmic bias**; **§J** covers **platform evolution and microservices** — including **ML vs infrastructure drift** ([§J.17](#j17-drift-detection)).
 
 **Today (MVP):** Expo clients → Node API on managed PaaS → Supabase → OpenAI + Google Vision.  
 **Future:** Same app logic on **GKE** (Google Cloud) or **EKS** (AWS), with async workers, CDN/WAF, analytics warehouse, and **eval automation** in CI + cluster sandbox.
@@ -334,7 +334,7 @@ The **eval-sandbox** namespace runs automated agent and population checks in CI 
 
 ---
 
-## G. CI automation — GitHub Actions (and Terraform note)
+## G. CI automation — GitHub Actions (and Terraform)
 
 Evals are wired into **GitHub Actions** so the same checks run locally and in CI.
 
@@ -358,17 +358,34 @@ Same commands you run in Replit — no API keys.
 
 Eval result artifacts upload to GitHub for review — pass rate is **not** a live production metric.
 
-### G.3 Terraform (future)
+### G.3 Terraform — Infrastructure as Code (future)
 
-**Today:** API on Heroku, web on Netlify, Supabase SaaS — **no Terraform in this lab**.
+**Today:** API on Heroku, web on Netlify, Supabase SaaS — **no Terraform in this lab**. PaaS config vars are enough at MVP scale.
 
-**Phase 2–3 (planned):** Terraform provisions **GKE or EKS** (VPC, node pools, IAM), **eval-sandbox namespace**, event buses (Pub/Sub or SQS), CDN/WAF, and observability. Helm deploys the API; eval jobs run as CI-triggered workloads — **not** user traffic.
+**Phase 2–3 (planned):** [Terraform](https://developer.hashicorp.com/terraform/docs) provisions the **cloud control plane** — VPC, GKE/EKS, IAM, Pub/Sub (or SQS), CDN/WAF, observability — as versioned `.tf` files in git. **Helm** deploys app workloads; **GitHub Actions** runs build → eval → `terraform plan` → (approved) `apply`.
 
-| Layer | Purpose |
-|-------|---------|
-| **Terraform** | Clusters, networking, managed Prometheus/Grafana |
-| **Helm** | API, workers, eval-sandbox |
-| **GitHub Actions** | Build → test → eval → deploy |
+> **Official reference:** [Terraform documentation](https://developer.hashicorp.com/terraform/docs). Deeper reads: [configuration language](https://developer.hashicorp.com/terraform/language), [state](https://developer.hashicorp.com/terraform/language/state), [modules](https://developer.hashicorp.com/terraform/language/modules), [CLI `plan` / `apply`](https://developer.hashicorp.com/terraform/cli/commands/plan).
+
+| Concept | What it means (lab cheat sheet) |
+|---------|----------------------------------|
+| **Infrastructure as Code** | Infra in files, reviewed in PRs — not manual console clicks |
+| **Declarative config** | Describe *desired state*; Terraform reconciles the cloud to match |
+| **Plan vs apply** | `plan` = dry-run diff; `apply` = execute after review |
+| **State** | Tracks what Terraform created (remote backend in GCS/S3 — **not** in git) |
+| **Variables & outputs** | Per-environment inputs; outputs feed deploy jobs or other modules |
+| **Modules** | Reusable `.tf` packages — same cluster pattern for staging and prod |
+| **Idempotency** | Re-run `apply` safely — no change → “0 to add, 0 to change, 0 to destroy” |
+| **Environments** | Separate state per env (`dev` / `staging` / `prod`) — never share prod state |
+
+**What Terraform provisions (not Helm):** VPC and subnets, GKE/EKS cluster, Workload Identity / IRSA, Pub/Sub + dead-letter topics, CDN/WAF, managed Prometheus/Grafana, and the **eval-sandbox** namespace for warm CI golden queries — isolated from user traffic. See [§J](./APPENDIX.md#j-platform-evolution--microservices--lab-connection) for how this fits the phased migration.
+
+| Layer | Owns | Tool |
+|-------|------|------|
+| **Platform** | Clusters, networking, IAM, event bus, edge, observability | Terraform |
+| **Workloads** | API, workers, eval-sandbox pods | Helm |
+| **Pipeline** | Build → test → eval → plan/apply → deploy | GitHub Actions |
+
+**Honest status:** Terraform is **planned**, not shipped. Eval gates (population + agent routing) stay in GitHub Actions — Terraform changes *where* workloads run, not *what* we verify.
 
 You do **not** need cloud accounts for this lab; this documents **where automation goes** when the platform scales off PaaS.
 
@@ -391,7 +408,7 @@ Evals run on **GitHub-hosted runners** — not on user request paths.
 
 ### H.2 Future platform options
 
-See §A–C above. Pick **one** hyperscaler (GKE + BigQuery **or** EKS + Athena/Glue).
+See [§A–C](./APPENDIX.md#a-future-target--google-cloud-gke) (architecture) and [§G.3](./APPENDIX.md#g3-terraform--infrastructure-as-code-future) (IaC). Pick **one** hyperscaler (GKE + BigQuery **or** EKS + Athena/Glue).
 
 | Option | When it fits |
 |--------|----------------|
@@ -406,7 +423,7 @@ See §A–C above. Pick **one** hyperscaler (GKE + BigQuery **or** EKS + Athena/
 | **267-case offline gate** | Shipped in example production stack — deterministic contracts block deploy |
 | **Live staging chat evals** | Shipped — weekly; real SSE/auth/threads |
 | **Semantic judge** | Opt-in — separate model scores rubric; not default PR CI |
-| **Eval sandbox on GKE/EKS** | Planned — warm pool namespace for full suite |
+| **Eval sandbox on GKE/EKS** | Planned — warm pool namespace; Terraform + Helm per §G.3 |
 | **Semantic retrieval eval layer** | Roadmap — paraphrase recall across locales (pgvector / hybrid search) |
 | **Third-party eval platforms** | Optional — dashboards/rubrics; **assertions stay in-repo** for deploy gate |
 
@@ -558,7 +575,7 @@ Participants often ask: *“Do we use data to reduce bias?”* Be precise:
 
 **Honest status:** **Kubernetes and microservices are not in production today.** This section describes a **future target** when scale and metrics justify phased change — not what you run in Replit.
 
-**Related appendix sections:** [§A–C](./APPENDIX.md#a-future-target--google-cloud-gke) (future GKE/AWS architecture) · [§H](./APPENDIX.md#h-managed-services--today-vs-future-evals--platform) (managed services) · [§I.6](./APPENDIX.md#i6-what-passing-does-not-prove) (what evals do not prove)
+**Related appendix sections:** [§A–C](./APPENDIX.md#a-future-target--google-cloud-gke) (future GKE/AWS architecture) · [§G.3](./APPENDIX.md#g3-terraform--infrastructure-as-code-future) (Terraform IaC) · [§H](./APPENDIX.md#h-managed-services--today-vs-future-evals--platform) (managed services) · [§I.6](./APPENDIX.md#i6-what-passing-does-not-prove) (what evals do not prove) · [§J.17](#j17-drift-detection) (ML vs infrastructure drift)
 
 ---
 
@@ -868,7 +885,7 @@ Production deploy blockers prove **code contracts**, not clinical outcomes or le
 
 - Evals verify **alignment in code** — they are **not legal proof** of FDA, ADA, or privacy compliance.
 - Offline mocks **cannot** catch model drift, cross-service wiring bugs, or production IAM/network misconfiguration.
-- Live staging evals and periodic human review close part of that gap.
+- Live staging evals and periodic human review close part of that gap. Full drift taxonomy: [§J.17](#j17-drift-detection).
 
 ---
 
@@ -948,6 +965,7 @@ Helm charts, eval suites, Supabase, and OpenAI are portable either way.
 | “Do offline evals prove FDA or clinical safety?” | **No.** Code contracts only — [§J.10](#j10-what-offline-evals-prove--and-what-they-do-not). |
 | “Why not split everything now?” | Operational cost; premature splits → *distributed monolith*. |
 | “What splits first?” | **Scan** (vision cost) and **assistant** (LLM cost and safety). |
+| “How do you detect drift?” | **Two kinds:** ML/algorithm drift via eval gates + weekly live staging evals; infrastructure drift via CI/deploy gates today — full IaC reconciliation planned ([§J.17](#j17-drift-detection)). |
 
 **Do say:** Phased evolution · same eval contracts · shadow/canary before traffic · K8s/microservices **planned, not live** · general wellness — not FDA approved.
 
@@ -1010,6 +1028,105 @@ Modern platforms run **microservices and AI on the same operational plane**. [GK
 **Platform AI agents (internal ops):** Read-only cluster assist first; human approval for any write; audit every tool invocation; scrub secrets/PHI before LLM context.
 
 **Cost callout:** Idle GPUs dominate waste — monitor utilization before expanding self-hosted inference.
+
+---
+
+### J.17 Drift detection
+
+**Audience:** Engineers and facilitators answering “how do you know the system hasn’t silently changed?”
+
+**Drift** is overloaded in platform conversations. ScanAndFindIt treats two kinds separately — they share a name but not tooling, signals, or mitigations.
+
+| Concept | What drifts | Typical cause | Primary risk |
+| ------- | ----------- | ------------- | ------------ |
+| **Machine learning drift** | Data distributions, model outputs, or deterministic algorithm behavior over time | Vendor model updates, prompt/context changes, formula regressions, cohort skew | Wrong calories, unsafe assistant wording, degraded forecasts |
+| **Infrastructure drift** | Deployed runtime vs version-controlled intended state | Manual console edits, env-var drift, partial deploys, missing migrations | Auth misconfig, secret leaks, eval gates bypassed, cross-env wiring bugs |
+
+Neither replaces the other. Offline agent evals can pass while hosting config vars drift; a green deploy can still ship into an OpenAI model that rephrases safety disclaimers.
+
+#### J.17.1 Machine learning drift — detection today
+
+Most “ML drift” in this product is **contract and plausibility drift** — not retraining pipelines on production telemetry. Models are **managed APIs** (OpenAI, Google Vision); there is no in-repo model registry, feature store, or automated retrain loop.
+
+**Deterministic algorithm drift (Layer 0 and math evals)**
+
+| Signal | What is monitored | How detected | Response |
+| ------ | ----------------- | ------------ | -------- |
+| Goal-calorie pipeline | 1,000 NHANES-*like* synthetic adults vs DGA reference bands | Population eval — **≥ 85%** within band; sedentary median ratio **0.65–1.35** vs DGA midpoint | Block merge/deploy via math eval gate in CI |
+| Formula edge cases | 15 hand-curated personas (BMI, pregnancy, activity) | Synthetic profile regression tests | Same gate |
+| Forecast / research math | Trend ordering, risk ordering, horizon scaling, composite weights | Dedicated math eval suites | Same gate |
+
+This catches **systematic algorithm drift** in code — not live user-data distribution shift. There is no continuous production monitoring of input feature distributions.
+
+**LLM and agent drift (routing + wording)**
+
+| Signal | What is monitored | How detected | Response |
+| ------ | ----------------- | ------------ | -------- |
+| Tool routing, safety blocks, grounding contracts | Expected actions, tools, forbidden terms | **267 offline cases** — mocked LLM/tools | **Deploy gate** — zero allowed failures |
+| High-risk reply wording | Overdose, travel-compound, illness scenarios | Optional semantic judge (nightly CI); maintainer opt-in live response evals | Investigate failures; prompt/safety patch — **not** auto-retrain |
+| End-to-end assistant behavior | Real staging API + OpenAI + Supabase threads | **12 live chat cases** — weekly staging workflow (Mondays 08:00 UTC + manual) | Artifact review; fix wiring or prompts — **not** a deploy blocker |
+
+See [Live evals — beyond the offline gate](./README.md#live-evals--beyond-the-offline-gate).
+
+**Limitations (state plainly in the lab):**
+
+- Offline mocks **cannot** see live OpenAI **wording drift** — scope in [§J.10](#j10-what-offline-evals-prove--and-what-they-do-not).
+- Live evals run **weekly**, not on every PR — drift can appear between runs.
+- No production **data-distribution** or **concept-drift** monitors (e.g. PSI on scan inputs, embedding shift).
+- In-memory agent metrics (latency, tokens, cost) are useful for ops — **not** automated drift alerting.
+- Forecast RMSE/drift dashboards are **planned backlog** — not shipped.
+- **No retraining workflow** — mitigation is prompt/safety/routing code changes plus eval expansion, not model fine-tuning.
+
+#### J.17.2 Infrastructure drift — detection today
+
+**Today:** Heroku (API), Netlify (web), Supabase (Postgres/auth) — **no Terraform, Helm, or GitOps controller in the public lab repo** (planned Phase 1+ — [§G.3](./APPENDIX.md#g3-terraform--infrastructure-as-code-future)). Infrastructure drift is therefore **partially** addressed: strong **pipeline gates** and **versioned schema**, weak **continuous reconciliation** against live cloud state.
+
+**What is in place**
+
+| Layer | What is monitored | How detected | Response |
+| ----- | ----------------- | ------------ | -------- |
+| **Pre-deploy integrity** | Math evals + 267 agent cases + AI safety tests | Pre-deploy precision verification gate | Block publish |
+| **Release structure** | Required surfaces, locale tests, compliance files | Production readiness checks in CI | Block merge / weekly schedule |
+| **CI hygiene** | Unit tests, schema checks, security scans, secrets boundary | API/client CI + security workflow (SAST, dependency review) | Block merge |
+| **Deploy config presence** | Required hosting secrets and smoke URLs | Pre-deploy env validation scripts | Block deploy — validates **presence**, not live value parity |
+| **Post-deploy smoke** | API health after push | Smoke check in deploy pipeline | Fail deploy job |
+| **Database schema** | Intended Postgres shape | Versioned SQL migrations in source control | Manual/CI apply to Supabase — **no** automated drift scan vs live DB |
+| **Locale / compliance copy** | Six-locale disclaimers, forbidden FDA claims | Locale compliance tests + agent eval forbidden-term assertions | Block merge |
+| **Runtime errors** | Uncaught exceptions, client crashes | Sentry (API + mobile) | Ad hoc investigation — **no** formal SLO burn alerts yet ([§J.12](#j12-production-platform-foundations) gap) |
+
+**What is not in place yet**
+
+| Gap | Current impact | Target mitigation (Phase 1+) |
+| --- | -------------- | ---------------------------- |
+| **IaC reconciliation** | Manual PaaS dashboard edits are invisible to git | Terraform `plan` in CI; declarative env per [§G.3](./APPENDIX.md#g3-terraform--infrastructure-as-code-future) |
+| **GitOps / desired-state sync** | No controller re-applies K8s or Helm manifests | Helm + Argo CD / Flux after GKE lift |
+| **Continuous config audit** | Env vars on PaaS may diverge from documented intent | Secret Manager + External Secrets; config export diff job |
+| **Infra shadow/canary** | Planned for service splits, not live today | [§J.8](#j8-shadow-canary-and-rollback-criteria) — compare K8s vs Heroku latency/error parity before cutover |
+| **Eval pass rate in prod metrics** | CI artifacts only | Prometheus/Grafana SLO dashboards |
+
+**Honest summary:** Pipeline and schema **version control** prevent *shipping* known-bad code; they do **not** continuously prove that production PaaS settings match the repo. That gap closes with Terraform plan/apply, GitOps reconciliation, and post-lift shadow traffic ([§J.8](#j8-shadow-canary-and-rollback-criteria)).
+
+#### J.17.3 Comparison — ML drift vs infrastructure drift
+
+| Drift type | What is monitored | How this project detects it | Mitigation or response |
+| ---------- | ----------------- | ----------------------------- | ---------------------- |
+| **Algorithm / population (ML-adjacent)** | Synthetic cohort calorie bands, formula personas, forecast/research invariants | Math eval gate in CI + pre-deploy | Fix goal/forecast code; block deploy until green |
+| **Agent routing & safety contracts** | Tool choice, blocks, forbidden claims (mocked) | 267 offline cases | Block deploy; expand eval cases on regression |
+| **Live LLM wording & E2E wiring** | Staging chat SSE, high-risk reply scenarios | Weekly live staging workflow; opt-in semantic/live suites | Prompt/safety fixes; manual rerun — not deploy gate |
+| **Production data / concept drift** | User scan/chat feature distributions | **Not implemented** | Planned observability backlog; periodic human review |
+| **Model retraining degradation** | Offline vs online model quality | **Not applicable** — managed APIs, no retrain pipeline | Vendor model pinning/changelog review; eval expansion |
+| **Deploy / config integrity** | Tests, evals, required files, secrets boundary | Pre-deploy verification + CI checks | Block deploy |
+| **PaaS env & hosting config** | Secret/var **presence**; smoke health | Pre-deploy env checks; post-deploy smoke | Fix hosting config manually |
+| **Cloud infra vs IaC** | VPC, GKE, IAM, Pub/Sub desired state | **Not implemented** — no Terraform in repo today | Planned: Terraform plan on PR, apply after eval gates ([§G.3](./APPENDIX.md#g3-terraform--infrastructure-as-code-future)) |
+| **Runtime observability drift** | Error rate, latency SLOs, eval pass rate trends | Sentry today; informal SLOs | Phase 1: Prometheus/Grafana + alert runbooks |
+
+#### J.17.4 Lab talking points
+
+- **Two drifts, two toolchains** — eval gates protect *code contracts*; live evals sample *vendor model behavior*; neither replaces IaC reconciliation.
+- **Deploy green ≠ production unchanged** — weekly live evals and planned Terraform/GitOps close different gaps than offline 267/267.
+- **Scale the gates, not away from them** — [§J.8](#j8-shadow-canary-and-rollback-criteria) re-runs the same eval suite after every infra phase; drift detection expands (shadow traffic, plan diffs), it does not replace Layer 0 and agent locks.
+
+---
 
 ---
 
