@@ -7,13 +7,15 @@
     "url": "https://github.com/wewesemsem/scanandfind-lab.git"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "population-eval": "node population-eval/run-population-eval.js",
     "agent-eval": "node agent-routing-eval/run-agent-eval.js",
     "agent-eval:verbose": "node agent-routing-eval/run-agent-eval.js --verbose",
-    "start": "npm run population-eval"
-  },
-  "engines": {
-    "node": ">=18"
+    "start": "npm run population-eval",
+    "platform:cluster": "kind create cluster --name eval-lab --config platform-sandbox/kind-config.yaml",
+    "platform:destroy": "sh -c 'cd platform-sandbox/terraform && terraform destroy -auto-approve 2>/dev/null || true; kind delete cluster --name eval-lab 2>/dev/null || true'"
   }
 }

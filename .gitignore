@@ -2,6 +2,11 @@ node_modules/
 .DS_Store
 *.log
 
+# Terraform local state (Part 3)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+
 .env
 .env.*
 !.env.example

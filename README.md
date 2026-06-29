@@ -1,8 +1,8 @@
 # ScanAndFindIt Interactive Lab
 
-**Self-guided workshop** (~25–30 minutes) on evals, architecture, and integrity for a wellness app with nutrition math and an in-app AI assistant.
+**Self-guided workshop** (~25–30 minutes core; optional **Part 3** adds ~25 minutes) on evals, architecture, and integrity for a wellness app with nutrition math and an in-app AI assistant.
 
-No facilitator required. No private repo access. No API keys. Import this repo into [Replit](https://replit.com) or clone locally — Node.js 18+ only, zero dependencies.
+No facilitator required. No private repo access. No API keys. Import this repo into [Replit](https://replit.com) or clone locally — Node.js 20+ only, zero npm dependencies. **Part 3** runs locally with free tools ([kind](https://kind.sigs.k8s.io/), [Terraform](https://developer.hashicorp.com/terraform/docs)) — no cloud account.
 
 ---
 
@@ -13,12 +13,13 @@ No facilitator required. No private repo access. No API keys. Import this repo i
 3. [Lab vs production](#lab-vs-production)
 4. [Part 1 — Trust the Math](#part-1--trust-the-math)
 5. [Part 2 — Trust the Agent](#part-2--trust-the-agent)
-6. [Integrity & wellness boundaries](#integrity--wellness-boundaries)
-7. [Self-debrief](#self-debrief)
-8. [Quick reference](#quick-reference)
-9. [Appendix — GCP, AWS, RAG, CI, bias & future platform](./APPENDIX.md) *(optional)*
+6. [Part 3 — Trust the Gate (optional)](#part-3--trust-the-gate-optional)
+7. [Integrity & wellness boundaries](#integrity--wellness-boundaries)
+8. [Self-debrief](#self-debrief)
+9. [Quick reference](#quick-reference)
+10. [Appendix — GCP, AWS, RAG, CI, bias & future platform](./APPENDIX.md) *(optional reading)*
 
-*(Part 2 includes [Generator vs evaluator models](#generator-vs-evaluator-who-answers-vs-who-judges) and [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate).)*
+*(Part 2 includes [Generator vs evaluator models](#generator-vs-evaluator-who-answers-vs-who-judges) and [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate). Part 3 — **Trust the Gate** — runs the same evals on local Kubernetes + Terraform; the appendix stays reference-only.)*
 
 ---
 
@@ -32,6 +33,11 @@ By the end you should be able to:
 4. Connect **integrity** (doing what you promise) to bias, FDA/wellness boundaries, and scale.
 5. Name **hidden risks** when a wellness platform serves users at large scale.
 
+**Optional Part 3 — Trust the Gate** (~25 min, local only, $0):
+
+6. Apply **Terraform** to declare an isolated **eval-sandbox** namespace and Job on a local cluster.
+7. Run the same population + agent eval gates inside **Kubernetes** that CI runs on GitHub Actions.
+
 ---
 
 ## Before you start
@@ -39,7 +45,8 @@ By the end you should be able to:
 | Item | What to do |
 |------|------------|
 | **Environment** | Replit: *Create Repl* → *Import from GitHub* → `wewesemsem/scanandfind-lab`. Or: `git clone https://github.com/wewesemsem/scanandfind-lab.git` |
-| **Time** | Part 1 ≈ 12 min · Part 2 ≈ 13 min · Self-debrief ≈ 5 min |
+| **Time** | Part 1 ≈ 12 min · Part 2 ≈ 13 min · Self-debrief ≈ 5 min · Part 3 (optional) ≈ 25 min |
+| **Part 3 only** | [Docker](https://docs.docker.com/get-docker/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), [kubectl](https://kubernetes.io/docs/tasks/tools/), [Terraform ≥ 1.5](https://developer.hashicorp.com/terraform/install). Windows: use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) + Docker inside Linux. |
 | **Ground rules** | General wellness education only — not FDA-approved, not clinical advice. No real user data. |
 
 **Integrity in one sentence:** [Integrity](https://www.clrn.org/what-is-integrity-in-ethics/) means acting in line with your stated values. ScanAndFindIt positions itself as *general wellness education*; evals and disclaimers are how engineers **verify** that alignment in code (alignment checks, not legal proof of compliance).
@@ -61,6 +68,8 @@ The table below describes an **example production architecture** (maintainers' p
 | **Connection** | Runs entirely in this repo | Blocks deploy on failure |
 
 Passing here does **not** mean a production release passed. The cases here are *inspired by* high-impact scenarios (#2 food coloring guard, #7 food scan, #10 SDOH, Healthy Map guards).
+
+> **Example PaaS (not a vendor lock-in lesson):** Production examples cite **Heroku** and **Netlify** as one managed-PaaS path. The pattern — containerized API behind HTTPS, env-based config, CI eval gates — ports to [Google Cloud Run](https://cloud.google.com/run/docs), [AWS App Runner](https://docs.aws.amazon.com/apprunner/), [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/), Railway, Fly.io, or Kubernetes (Part 3). See [APPENDIX.md](./APPENDIX.md) for future GKE/EKS targets.
 
 ---
 
@@ -426,7 +435,7 @@ flowchart LR
 
 ### Hands-on — Agent routing eval
 
-This folder uses a **simplified pattern matcher** (`router.js`), not a real language model. It teaches *routing mechanics* — the same failure modes production guards against.
+> **Lab vs production routing:** This folder uses a **deterministic regex pattern matcher** (`router.js`), not an LLM. Production combines an **OpenAI chat model** with safety gates, skills, and tool orchestration — routing is probabilistic; evals lock **contracts** (expected tools/actions) using mocks for fast CI. Do **not** assume regex lists scale to every locale or paraphrase; they teach *failure modes* (wrong scanner, wrong tool), not production NLU. See [Live evals — beyond the offline gate](#live-evals--beyond-the-offline-gate).
 
 **Run it:**
 
@@ -461,6 +470,116 @@ npm run agent-eval -- --tags sdoh,healthy-map --verbose
 
 ---
 
+## Part 3 — Trust the Gate (optional)
+
+**Time:** ~25 min · **Cost:** $0 · **Cloud account:** not required
+
+Run the same population + agent **eval gates** from Parts 1–2 inside an isolated Kubernetes Job — declared with Terraform on your laptop. This implements the [eval-sandbox namespace](./APPENDIX.md#f-eval-sandbox-on-kubernetes-why-it-appears-in-both-diagrams) concept from the appendix (same scripts as CI, different runtime). For hyperscaler targets (GKE/EKS, VPC, IAM), keep reading [APPENDIX.md](./APPENDIX.md).
+
+| | Part 3 — Trust the Gate | Appendix |
+|---|----------------------|----------|
+| **You run** | kind + Terraform + kubectl | Architecture reading |
+| **Cost** | $0 | N/A |
+| **Teaches** | IaC workflow, Job isolation | Future production target |
+
+### What you will run
+
+```mermaid
+flowchart LR
+  TF[Terraform apply] --> NS[eval-sandbox namespace]
+  TF --> Job[Kubernetes Job]
+  Job --> Pop[population-eval]
+  Job --> Agent[agent-eval]
+```
+
+| Step | Tool | Official reference |
+|------|------|-------------------|
+| Local cluster | [kind](https://kind.sigs.k8s.io/docs/user/quick-start/) | Kubernetes in Docker — free |
+| Declare namespace + Job | [Terraform kubernetes provider](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs) | [Terraform language](https://developer.hashicorp.com/terraform/language) |
+| Workload | [Kubernetes Job](https://kubernetes.io/docs/concepts/workloads/controllers/job/) | Batch eval gate; not user traffic |
+
+### Before Part 3
+
+From the **repo root**, confirm:
+
+```bash
+docker version          # Docker running
+kind version            # kind installed
+kubectl version --client
+terraform version       # ≥ 1.5
+node --version          # ≥ 20 (matches CI and Job image)
+```
+
+### 3.1 — Terraform (~12 min)
+
+**Goal:** Describe *desired state* (namespace + eval Job); let Terraform reconcile the cluster.
+
+1. **Create the local cluster** (mounts this repo at `/lab` inside the node — see [`platform-sandbox/kind-config.yaml`](platform-sandbox/kind-config.yaml)):
+
+```bash
+npm run platform:cluster
+kubectl cluster-info --context kind-eval-lab
+```
+
+2. **Init and plan** (local [state file](https://developer.hashicorp.com/terraform/language/state) — not committed):
+
+```bash
+cd platform-sandbox/terraform
+terraform init
+terraform plan
+```
+
+You should see **1 namespace** and **1 Job** to add. Read the plan: which resource owns the eval runner?
+
+3. **Apply**, then verify idempotency ([HashiCorp: plan vs apply](https://developer.hashicorp.com/terraform/cli/commands/plan)):
+
+```bash
+terraform apply
+terraform plan    # expect: 0 to add, 0 to change, 0 to destroy
+```
+
+> **Production delta:** Real platforms use a **remote backend** (GCS/S3) and provision VPC + GKE/EKS — not a kind cluster. Part 3 teaches the *workflow*; the appendix describes the *cloud scope*.
+
+### 3.2 — Kubernetes eval gate (~13 min)
+
+**Goal:** Same gates as [`.github/workflows/evals.yml`](.github/workflows/evals.yml), inside `eval-sandbox`.
+
+1. **Wait for the Job** and read logs:
+
+```bash
+kubectl wait --for=condition=complete job/eval-gate -n eval-sandbox --timeout=120s
+kubectl logs job/eval-gate -n eval-sandbox
+```
+
+Expect population **PASS** (≥ 85%) and agent **5 passed, 0 failed**. The Job exits non-zero if either script fails — same contract as CI.
+
+2. **Inspect isolation:**
+
+```bash
+kubectl get ns eval-sandbox
+kubectl describe job/eval-gate -n eval-sandbox
+```
+
+3. **Teardown** (avoid leaving Docker resources running):
+
+```bash
+npm run platform:destroy
+```
+
+<details>
+<summary><strong>Check your understanding</strong></summary>
+
+**Q:** Why run evals in a Job instead of on your laptop?
+
+**A:** Same scripts, but the Job pattern matches how CI and future [eval-sandbox](./APPENDIX.md#f-eval-sandbox-on-kubernetes-why-it-appears-in-both-diagrams) namespaces run regression gates — isolated from user-serving workloads.
+
+**Q:** Does Part 3 replace cloud Terraform from the appendix?
+
+**A:** **No.** You practiced declarative config + apply on a local cluster. Appendix §G.3 still describes VPC, IAM, and remote state on a hyperscaler when the product scales off PaaS.
+</details>
+
+---
+
 ## Integrity & wellness boundaries
 
 Integrity here means **consistency between what you promise and what the system does**.
@@ -471,7 +590,7 @@ Integrity here means **consistency between what you promise and what the system 
 | **Wellness vs clinical** | General education — not diagnosis or prescription | Disclaimers, no diagnostic phrasing in guards |
 | **FDA** | General wellness scope — not a regulated device | No “FDA approved” claims; evals block them |
 | **Citations** | ODPHP / MedlinePlus for educational replies | Supports **traceability and grounding** — not a guarantee every statement is correct |
-| **Accessibility & i18n** | Multiple languages, accessible UI | **Locale compliance tests** check disclaimer and wellness-copy keys in six locales (EN, ES, AR, ZH, HI, SW) — not full jurisdiction-by-jurisdiction legal sign-off |
+| **Accessibility & i18n** | Multiple languages, accessible UI | **Locale compliance tests** (six locales) check disclaimer *copy keys* — **not** a [WCAG 2.x](https://www.w3.org/WAI/standards-guidelines/wcag/) audit of the live app. This lab is Markdown + terminal output; screen-reader testing of the mobile/web UI is separate product work. Evals verify **wording contracts**; they are **alignment checks**, not ADA legal sign-off. |
 | **Security** | Auth, rate limits, encrypted sensitive data | Safety evals block jailbreaks |
 
 <details>
@@ -490,6 +609,7 @@ Answer these in your own words (notes or discussion):
 2. **LLM limits:** Why aren't routing evals enough on their own? What can still go wrong in the **wording** of a reply?
 3. **Scale:** Name one bug that only shows up when you test **hundreds of synthetic profiles** instead of one hand-picked user.
 4. **Integrity:** Pick one row from the Top 10 table above. What would a user lose if that case failed in a production deployment?
+5. **(Optional — Trust the Gate)** Why run the same eval scripts in a Kubernetes Job instead of only on GitHub Actions?
 
 ---
 
@@ -498,8 +618,11 @@ Answer these in your own words (notes or discussion):
 ### Repo structure
 
 ```
-├── population-eval/     # Mifflin–St Jeor + DGA band checks
-└── agent-routing-eval/  # Pattern-matcher routing + tool guards
+├── population-eval/        # Mifflin–St Jeor + DGA band checks
+├── agent-routing-eval/     # Pattern-matcher routing + tool guards
+└── platform-sandbox/       # Part 3 — Trust the Gate (kind + Terraform, $0)
+    ├── kind-config.yaml
+    └── terraform/
 ```
 
 ### Commands
@@ -510,18 +633,21 @@ npm run population-eval
 npm run agent-eval
 npm run agent-eval:verbose
 npm run agent-eval -- --tags sdoh,healthy-map
+npm run platform:cluster    # Part 3 — Trust the Gate: create kind cluster
+npm run platform:destroy    # Part 3 — Trust the Gate: teardown
 ```
 
 ### How evals pass (mechanics)
 
-- **Population** — `nhanesSampler-lite` → `goalCalculator-lite` → `dgaReference-lite` → compare to ≥ 85% band rule.
+- **Population** — `nhanesSampler-lite` → `goalCalculator-lite` → `dgaReference-lite` → compare to ≥ 85% band rule. Exits **non-zero** on failure (same as agent eval).
 - **Agent** — `cases/*.json` defines expected outcomes; `router.js` implements simplified routing; `run-agent-eval.js` compares and exits non-zero on failure.
+- **Part 3 Job** — runs both scripts inside `eval-sandbox` on kind.
 
-CI runs the same commands on every push (`.github/workflows/evals.yml`).
+CI runs population + agent evals on every push (`.github/workflows/evals.yml`).
 
 ### Optional appendix
 
-For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation** (GitHub Actions, Terraform roadmap), **managed services today vs future**, how the assistant uses **retrieval-augmented generation** (ODPHP, MedlinePlus, tools, memories), and **algorithmic bias** mitigation, see [APPENDIX.md](./APPENDIX.md) (§I for bias).
+For **future platform diagrams** (Google Cloud GKE vs AWS EKS), **CI automation**, **managed services today vs future**, **retrieval-augmented generation**, and **algorithmic bias** mitigation, see [APPENDIX.md](./APPENDIX.md) (§I for bias). **Part 3 — Trust the Gate** is the hands-on local track; the appendix stays reference architecture.
 
 ### Ground rules
 

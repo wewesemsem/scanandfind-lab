@@ -16,19 +16,28 @@ function runPopulation() {
     if (isWithinBand(kcal, band)) within++;
   }
   const pct = within / N;
+  const pass = pct >= MIN_WITHIN_BAND;
   console.log(`Population: ${within}/${N} (${(pct * 100).toFixed(1)}%) within DGA band`);
-  console.log(pct >= MIN_WITHIN_BAND ? 'PASS' : 'FAIL', `(need ≥ ${MIN_WITHIN_BAND * 100}%)`);
+  console.log(pass ? 'PASS' : 'FAIL', `(need ≥ ${MIN_WITHIN_BAND * 100}%)`);
+  return pass;
 }
 
 function runPersonas() {
   console.log('\nHand-curated personas:');
+  let allPass = true;
   for (const row of personas.users) {
     const kcal = calculateCalories(row.profile);
     const { plausibility } = row;
     const ok = kcal >= plausibility.caloriesMin && kcal <= plausibility.caloriesMax;
+    if (!ok) allPass = false;
     console.log(`  ${row.id}: ${kcal} kcal — ${ok ? 'PASS' : 'FAIL'}`);
   }
+  return allPass;
 }
 
-runPopulation();
-runPersonas();
+const populationPass = runPopulation();
+const personasPass = runPersonas();
+
+if (!populationPass || !personasPass) {
+  process.exit(1);
+}

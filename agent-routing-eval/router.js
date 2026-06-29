@@ -1,6 +1,9 @@
 /**
  * Educational pattern matcher for assistant navigation + tool inference.
  * Simplified subset of production assistantTools + toolRegistry behavior.
+ *
+ * NOT production NLU: production uses an LLM + safety/skills/tools pipeline;
+ * this stub is deterministic for fast, keyless CI. See README Part 2.
  */
 
 const NEGATIVE_PATTERNS = [

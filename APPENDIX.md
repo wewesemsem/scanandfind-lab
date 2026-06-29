@@ -2,8 +2,10 @@
 
 Optional reading after the main lab exercises. Diagrams describe **where the product is headed** (Phase 2–3 on a hyperscaler), not what you run in Replit today. **§G** covers **CI and Terraform**; **§H** covers **managed services**; **§I** covers **algorithmic bias**; **§J** covers **platform evolution and microservices** — including **ML vs infrastructure drift** ([§J.17](#j17-drift-detection)).
 
-**Today (MVP):** Expo clients → Node API on managed PaaS → Supabase → OpenAI + Google Vision.  
+**Today (MVP):** Expo clients → Node API on managed PaaS (e.g. Heroku — one example host; pattern ports to Cloud Run, App Runner, Container Apps, or K8s) → Supabase → OpenAI + Google Vision.  
 **Future:** Same app logic on **GKE** (Google Cloud) or **EKS** (AWS), with async workers, CDN/WAF, analytics warehouse, and **eval automation** in CI + cluster sandbox.
+
+**Hands-on — Trust the Gate (Part 3):** [README Part 3](./README.md#part-3--trust-the-gate-optional) — free kind + Terraform eval Job; no cloud account. This appendix remains reference architecture for hyperscaler targets.
 
 Pick **one** cloud for production — mixing GCP and AWS control planes adds operational cost. Supabase, OpenAI, and Google Vision stay external SaaS on either path.
 
@@ -360,7 +362,7 @@ Eval result artifacts upload to GitHub for review — pass rate is **not** a liv
 
 ### G.3 Terraform — Infrastructure as Code (future)
 
-**Today:** API on Heroku, web on Netlify, Supabase SaaS — **no Terraform in this lab**. PaaS config vars are enough at MVP scale.
+**Today:** API on Heroku, web on Netlify, Supabase SaaS — **no cloud Terraform in this lab**. PaaS config vars are enough at MVP scale. For **Trust the Gate** (local Terraform + kind, $0), see [README Part 3](./README.md#part-3--trust-the-gate-optional).
 
 **Phase 2–3 (planned):** [Terraform](https://developer.hashicorp.com/terraform/docs) provisions the **cloud control plane** — VPC, GKE/EKS, IAM, Pub/Sub (or SQS), CDN/WAF, observability — as versioned `.tf` files in git. **Helm** deploys app workloads; **GitHub Actions** runs build → eval → `terraform plan` → (approved) `apply`.
 
@@ -497,7 +499,7 @@ Report disparities with **structural context** (design, infrastructure, policy) 
 | **Mandatory citations** | ODPHP / MedlinePlus for educational replies — reduces invented “facts” |
 | **Live + semantic judge (opt-in)** | Second model scores high-risk **wording** (overdose + driving, travel compound) when mocks are not enough |
 | **Inclusive gender options** | Profile supports diverse gender identity; math uses documented buckets with explicit floors |
-| **ADA-oriented UX** | WCAG labels, focus, large text (ongoing product work) |
+| **ADA-oriented UX** | WCAG labels, focus, large text (ongoing product work) — product UI milestone; **not** verified by this public lab (Markdown + terminal). Locale copy-key tests ≠ [WCAG](https://www.w3.org/WAI/standards-guidelines/wcag/) audit. |
 
 ### I.4 Role of data — test harness, not debiasing training
 
