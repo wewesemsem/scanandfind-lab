@@ -2,7 +2,7 @@
 
 Self-guided workshop (~25–30 minutes core; optional **Part 3** adds ~25 minutes) on evals, architecture, and integrity for a wellness app with nutrition math and an in-app AI assistant.
 
-Import this repo into [Replit](https://replit.com) or clone locally — Node.js 20+ only, zero npm dependencies. No API keys. **Part 3** runs locally with [kind](https://kind.sigs.k8s.io/) and [Terraform](https://developer.hashicorp.com/terraform/docs) — no cloud account.
+Import this repo into [Replit](https://replit.com) or clone locally — Node.js 20+ only, zero npm dependencies. No API keys. **Part 3** runs locally with [kind](https://kind.sigs.k8s.io/) and [Terraform](https://developer.hashicorp.com/terraform/docs) — no managed cloud account required (Docker and local compute on your machine).
 
 ---
 
@@ -17,7 +17,7 @@ Import this repo into [Replit](https://replit.com) or clone locally — Node.js 
 7. [Integrity & wellness boundaries](#integrity--wellness-boundaries)
 8. [Self-debrief](#self-debrief)
 9. [Quick reference](#quick-reference)
-10. [Appendix — GCP, AWS, RAG, CI, bias & future platform](./APPENDIX.md) *(optional reading)*
+10. [Appendix — system design reference (scaling, evals, bias)](./APPENDIX.md) *(optional reading)* · [Architecture diagrams](./docs/architecture-reference.md)
 
 ---
 
@@ -31,7 +31,7 @@ By the end you should be able to:
 4. Connect **integrity** (doing what you promise) to bias, FDA/wellness boundaries, and scale.
 5. Name **hidden risks** when a wellness platform serves users at large scale.
 
-**Optional Part 3 — Trust the Gate** (~25 min, local only, $0):
+**Optional Part 3 — Trust the Gate** (~25 min, local only, no managed cloud):
 
 6. Apply **Terraform** to declare an isolated **eval-sandbox** namespace and Job on a local cluster.
 7. Run the same population + agent eval gates inside **Kubernetes** that CI runs on GitHub Actions.
@@ -65,7 +65,7 @@ By the end you should be able to:
 
 Passing here does **not** mean a production release passed. Cases here are *inspired by* high-impact scenarios (#2 food coloring guard, #7 food scan, #10 SDOH, Healthy Map guards).
 
-> Production examples cite **Heroku** and **Netlify** as one managed-PaaS path. The pattern — containerized API, env-based config, CI eval gates — ports to Cloud Run, App Runner, Azure Container Apps, Railway, Fly.io, or Kubernetes (Part 3). See [APPENDIX.md](./APPENDIX.md) for future GKE/EKS targets.
+> Production examples cite **Heroku** and **Netlify** as one managed-PaaS path. The pattern — containerized API, env-based config, CI eval gates — ports to Cloud Run, App Runner, Azure Container Apps, Railway, Fly.io, or Kubernetes (Part 3). See [APPENDIX.md](./APPENDIX.md) for scaling logic and [architecture diagrams](./docs/architecture-reference.md) for structural views.
 
 ---
 
@@ -108,6 +108,8 @@ An **eval** is a **repeatable, automated check** that scores system behavior aga
 ### Architecture — today (simplified)
 
 ScanAndFindIt is a wellness app: scan food and labels, set nutrition goals, view a health timeline, chat with an AI assistant.
+
+> **Legend:** Solid = implemented today · Dashed = conceptual / future / conditional
 
 ```mermaid
 flowchart LR
@@ -288,7 +290,7 @@ flowchart TB
 
 ### Architecture — in-app AI assistant (simplified)
 
-Chat, voice, and in-thread images share one **server-side agent workflow**:
+Chat, voice, and in-thread images share one **server-side agent workflow** (logical model — see [architecture-reference §3](./docs/architecture-reference.md#3-data-flow) for the data-flow view):
 
 ```mermaid
 flowchart LR
@@ -406,14 +408,14 @@ npm run agent-eval -- --tags sdoh,healthy-map --verbose
 
 ## Part 3 — Trust the Gate (optional)
 
-**Time:** ~25 min · **Cost:** $0 · **Cloud account:** not required
+**Time:** ~25 min · **Cost:** No hyperscaler bill (local Docker + compute) · **Cloud account:** not required
 
-Run the same population + agent **eval gates** from Parts 1–2 inside an isolated Kubernetes Job — declared with Terraform on your laptop. For hyperscaler targets (GKE/EKS, VPC, IAM), see [APPENDIX.md](./APPENDIX.md).
+Run the same population + agent **eval gates** from Parts 1–2 inside an isolated Kubernetes Job — declared with Terraform on your laptop. For scaling and infrastructure philosophy, see [APPENDIX.md](./APPENDIX.md).
 
 | | Part 3 — Trust the Gate | Appendix |
 |---|----------------------|----------|
 | **You run** | kind + Terraform + kubectl | Architecture reading |
-| **Cost** | $0 | N/A |
+| **Cost** | No managed cloud (local Docker + compute) | N/A |
 | **Teaches** | IaC workflow, Job isolation | Future production target |
 
 ### What you will run
@@ -446,7 +448,7 @@ node --version          # ≥ 20 (matches CI and Job image)
 
 ### 3.1 — Terraform (~12 min)
 
-**Goal:** Describe *desired state* (namespace + eval Job); let Terraform reconcile the cluster.
+**Goal:** Describe *desired state* (namespace + eval Job); `terraform apply` provisions those objects. Kubernetes controllers reconcile runtime state afterward — Terraform does not run a continuous reconciliation loop.
 
 1. **Create the local cluster** (mounts this repo at `/lab` inside the node — see [`platform-sandbox/kind-config.yaml`](platform-sandbox/kind-config.yaml)):
 
@@ -485,7 +487,7 @@ kubectl wait --for=condition=complete job/eval-gate -n eval-sandbox --timeout=12
 kubectl logs job/eval-gate -n eval-sandbox
 ```
 
-Expect population **PASS** (≥ 85%) and agent **5 passed, 0 failed**. The Job exits non-zero if either script fails — same contract as CI.
+Expect population **PASS** (≥ 85%) and agent **5 passed, 0 failed**. The Job exits non-zero if either script fails — same **logical** pass/fail contract as [`.github/workflows/evals.yml`](.github/workflows/evals.yml), but different execution semantics (pod scheduling vs GitHub-hosted runner).
 
 2. **Inspect isolation:**
 
@@ -522,7 +524,7 @@ Integrity here means **consistency between what you promise and what the system 
 
 | Topic | Product stance | How evals / design support it |
 |-------|----------------|-------------------------------|
-| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches cohort drift; routing cases cover six locales — **[Appendix §I](./APPENDIX.md#i-algorithmic-bias--mitigation--lab-connection)** |
+| **Algorithmic bias** | Goal math uses published DGA + [NHANES](https://www.cdc.gov/nchs/nhanes/about/index.html) *summary* stats | Population eval catches cohort drift; routing cases cover six locales — **[Appendix §6](./APPENDIX.md#6-bias--integrity-model)** |
 | **Wellness vs clinical** | General education — not diagnosis or prescription | Disclaimers, no diagnostic phrasing in guards |
 | **FDA** | General wellness scope — not a regulated device | No “FDA approved” claims; evals block them |
 | **Citations** | ODPHP / MedlinePlus for educational replies | Traceability and grounding — not a guarantee every statement is correct |
