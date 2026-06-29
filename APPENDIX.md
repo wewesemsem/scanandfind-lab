@@ -612,6 +612,29 @@ Modern platforms run **microservices and AI on the same operational plane**. Tre
 
 ScanAndFindIt today uses managed OpenAI + Google Vision — appropriate for eval-gated assistant contracts.
 
+#### J.11.1 AI agents for platform operations
+
+Beyond product-facing assistants (§D), **platform AI agents** help SREs and platform engineers run Kubernetes and cloud infrastructure. They accelerate diagnosis and drafting — they do **not** replace on-call judgment or change-management policy.
+
+| Use case | What an agent can do |
+| -------- | -------------------- |
+| **Cluster troubleshooting** | Correlate pod events, `CrashLoopBackOff`, node pressure, and recent deploys; suggest likely root causes and safe `kubectl` next steps |
+| **Log and metrics analysis** | Query centralized logs (Cloud Logging, Loki) and metrics (Prometheus, Grafana) in plain language; join signals across namespaces and time windows |
+| **Incident response** | Build timelines from alerts, summarize blast radius, draft runbook steps, prepare status updates for stakeholders |
+| **Cost optimization** | Flag idle GPU nodes, oversized requests/limits, orphaned volumes, and rightsizing opportunities |
+| **Capacity planning** | Forecast CPU, memory, and GPU headroom from historical usage; recommend HPA/VPA tuning or node-pool changes before saturation |
+
+**Benefits**
+
+| Benefit | Why it matters |
+| ------- | -------------- |
+| **Faster diagnosis** | Shorter mean-time-to-understand during incidents — less manual log grep and `describe` chaining |
+| **Consistent patterns** | Agents apply the same platform conventions (labels, probes, resource shapes) every time |
+| **Lower toil** | Repetitive triage moves off humans; engineers focus on judgment calls |
+| **Knowledge bridge** | New team members get guided context on an unfamiliar cluster or cloud provider |
+
+**Honest status:** Platform agents are **emerging practice**, not something this lab ships today. When ScanAndFindIt moves to GKE/EKS (§J), the same eval and approval gates that protect wellness integrity should govern any agent that can change infrastructure.
+
 > Production foundations (shared responsibility, IAM/secrets, networking/DR/observability) and integrity-at-scale matrix: [architecture-reference §7–8](./docs/architecture-reference.md#7-integrity--compliance-at-scale). Not required to complete the lab.
 
 ---
