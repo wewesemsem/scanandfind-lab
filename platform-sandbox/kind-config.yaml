@@ -1,5 +1,5 @@
 # Local kind cluster — mounts repo root at /lab inside the node for eval Jobs.
-# hostPath is relative to this config file (see kind docs).
+# hostPath is resolved relative to the cwd where `kind create` runs (repo root via npm run platform:cluster).
 # @see https://kind.sigs.k8s.io/docs/user/configuration/#extra-mounts
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -7,5 +7,5 @@ name: eval-lab
 nodes:
   - role: control-plane
     extraMounts:
-      - hostPath: ..
+      - hostPath: .
         containerPath: /lab
