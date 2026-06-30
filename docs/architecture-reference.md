@@ -4,7 +4,7 @@
 
 **Legend:** Solid boxes and arrows = implemented today · Dashed = conceptual / future / conditional
 
-**Order:** Current system → domain modules → data flow → event model → conceptual scaling (last)
+**Order:** Current system → domain modules → data flow → event model → conceptual scaling → phased evolution → GKE microservices → GKE cluster platform (last)
 
 ---
 
@@ -140,10 +140,15 @@ RAG retrieval detail: [APPENDIX §3 — Retrieval](../APPENDIX.md#retrieval--cit
 
 ```mermaid
 flowchart LR
-  API[API handler] -->|domain event| Bus[Conceptual event bus]
-  Bus --> Worker[Background worker]
-  Worker -->|idempotent write| SB[(Supabase)]
-  Bus -.->|failed| DLQ[Dead-letter queue]
+  subgraph txn [Same DB transaction]
+    API[API handler]
+    Outbox[(Transactional outbox)]
+    API --> Outbox
+  end
+  Outbox -->|relay| Bus[Conceptual event bus]
+  Bus -->|at-least-once| Worker[Background worker]
+  Worker -->|idempotency key| SB[(Supabase)]
+  Bus -.->|poison / failed| DLQ[Dead-letter queue]
 ```
 
 | Pattern | Purpose |
@@ -201,7 +206,208 @@ flowchart TB
 | **Future (when justified)** | 4 core APIs + workers | GKE or EKS + Supabase |
 | **Unchanged** | Same API URL, same eval gates, same wellness posture | — |
 
-Phased timeline and rollback criteria: [APPENDIX §4](../APPENDIX.md#4-scaling-model) · [§7](../APPENDIX.md#7-future-architecture-compressed)
+Phased timeline and rollback criteria: [APPENDIX §4](../APPENDIX.md#4-scaling-model) · [§7](../APPENDIX.md#7-future-architecture-compressed) · [§6 below](#6-phased-evolution)
+
+---
+
+## 6. Phased evolution
+
+> **Not implemented.** Metric-gated sequence — not calendar-driven. Users keep the **same API URL** through every phase.
+
+### High-level path
+
+```mermaid
+flowchart LR
+  A[Modular monolith<br/>one API · PaaS]
+  B[Buffered monolith<br/>queues · workers · outbox]
+  C[Microservices<br/>4 domains · same hostname]
+
+  A -->|contracts · timeline events| B
+  B -->|proven async patterns| C
+```
+
+| Stage | What changes | User-visible impact |
+|-------|--------------|---------------------|
+| **Modular monolith** | Four logical modules in one deploy unit | **None** — today |
+| **Buffered monolith** | Event bus, background workers, idempotency | **None** — faster dashboards over time |
+| **Microservices** | Optional domain splits behind path routing | **None** — same API URL |
+
+### Detailed phases (0–5)
+
+```mermaid
+flowchart TB
+  P0[Phase 0 — Foundation<br/>module contracts · timeline events]
+  P1[Phase 1 — Container lift<br/>same code on GKE/EKS + Helm]
+  P2[Phase 2 — Async workers<br/>event bus · outbox · DLQ]
+  P3[Phase 3 — First splits<br/>scan + assistant · shadow/canary]
+  P4[Phase 4 — Platform + integrations<br/>remaining domains extracted]
+  P5[Phase 5 — Edge + optional social<br/>CDN/WAF hardening]
+
+  P0 --> P1 --> P2 --> P3 --> P4 --> P5
+```
+
+Rollback triggers and shadow/canary gates: [APPENDIX §4](../APPENDIX.md#4-scaling-model).
+
+---
+
+## 7. Target microservices on GKE
+
+> **Not implemented.** Future steady state on **GKE** (EKS equivalent is structurally similar — different Ingress and IAM bindings). Same Supabase, same eval gates, same public API URL.
+
+```mermaid
+flowchart TB
+  subgraph Clients [Clients]
+    App[iOS / Android / Web]
+  end
+
+  subgraph Edge [Edge]
+    CDN[Cloud CDN + Cloud Armor]
+    GW[API Gateway<br/>LB path routing]
+  end
+
+  subgraph Services [Microservices — GKE]
+    SCAN[scan-service]
+    ASST[assistant-service]
+    PLAT[platform-service]
+    INT[integrations-service]
+  end
+
+  subgraph OptionalV3 [Optional v3 — defer until scale]
+    SOC[social-service]
+  end
+
+  subgraph Async [Event bus]
+    PS[Pub/Sub]
+    W1[worker-rollups]
+    W2[worker-alerts]
+    W3[worker-notifications]
+    DLQ[Dead-letter topic]
+  end
+
+  subgraph Data [Data plane]
+    SB[(Supabase Postgres<br/>schema-per-service)]
+    Redis[(Redis — scan cache only)]
+    GCS[Cloud Storage — feed media]
+  end
+
+  subgraph External [External systems]
+    OAI[OpenAI]
+    GV[Google Vision]
+    FDA[openFDA · OFF · USDA]
+    Wear[Wearables]
+  end
+
+  App --> CDN --> GW
+  GW --> SCAN & ASST & PLAT & INT
+  GW -.->|optional v3| SOC
+  SCAN --> GV & FDA
+  SCAN --> Redis
+  SCAN -->|events| PS
+  ASST --> OAI
+  ASST --> SB
+  PLAT --> SB
+  INT --> Wear & SB
+  SOC --> GCS & SB
+  PS --> W1 & W2 & W3
+  PS -.->|failed| DLQ
+  W1 & W2 & W3 --> SB
+  PLAT -->|events| PS
+  INT -->|events| PS
+```
+
+| Layer | Role |
+|-------|------|
+| **Edge** | Global cache + WAF; one hostname routes `/api/food/*` → scan, `/api/chat/*` → assistant |
+| **Microservices** | Four core deploy units — scan/assistant spikes do not take down goals or timeline |
+| **Event bus** | `scan.completed` → timeline updates without blocking the scan response |
+| **Workers** | Rollups, recall alerts, wearable sync — dashboards stay fast |
+| **Data plane** | Supabase with logical schema-per-service; Redis for ephemeral scan cache only |
+| **eval-sandbox** | Warm CI golden queries — never shares live user traffic ([Part 3](../README.md#part-3--trust-the-gate-optional)) |
+
+Service topology detail: [§7 above](#7-target-microservices-on-gke) · EKS mirror: CloudFront + AWS WAF, NAT Gateway, EKS, EventBridge → SQS + DLQ, Athena + Glue — [APPENDIX §8](../APPENDIX.md#8-infrastructure-philosophy).
+
+---
+
+## 8. GKE cluster platform
+
+> **Not implemented.** Cluster-level view — VPC, edge, decoupling, data, and observability. Pairs with [§7](#7-target-microservices-on-gke) (service wiring inside the cluster).
+
+```mermaid
+flowchart TB
+  subgraph dns [DNS and DR]
+    R53[Cloud DNS health checks]
+    R53 -->|primary| CDN
+    R53 -->|failover DR region| CDN_DR[Cloud CDN — DR region]
+  end
+
+  subgraph edge_gcp [Edge]
+    CDN[Cloud CDN + Cloud Armor]
+    CDN --> LB[External HTTPS Load Balancer]
+    CDN_DR --> LB_DR[HTTPS LB — DR region]
+  end
+
+  subgraph vpc_primary [VPC — primary region]
+    NAT[Cloud NAT]
+    subgraph private [Private subnets]
+      subgraph gke [GKE cluster — Helm]
+        API_DEP[api-monolith / microservices]
+        WORK_DEP[Pub/Sub workers]
+        EVAL[eval-sandbox namespace]
+        ANALYTICS[analytics-batch namespace]
+      end
+    end
+    private --> NAT
+  end
+
+  subgraph events [Decoupling]
+    PS[Pub/Sub]
+    DLQ[Dead-letter topic]
+    EA[Eventarc optional]
+    EA --> PS
+    PS --> WORK_DEP
+    PS -.->|failed| DLQ
+  end
+
+  subgraph data_layer [Data]
+    Supabase[(Supabase Postgres primary)]
+    Replica[(Read replica / PITR)]
+    BQ[BigQuery — analytics and R&D graph]
+    GCS[Cloud Storage — static / R&D assets]
+    Supabase --> Replica
+    Supabase -.->|ETL nightly| BQ
+    GCS -.-> ANALYTICS
+  end
+
+  subgraph obs [Observability]
+    Prom[Prometheus / Managed Prometheus]
+    Graf[Grafana]
+    Logs[Cloud Logging]
+    Prom --> Graf
+    Logs --> Graf
+  end
+
+  Mobile[Expo clients] --> CDN
+  Web[Expo web or Firebase Hosting] --> CDN
+  LB --> API_DEP
+  API_DEP --> Supabase
+  API_DEP --> PS
+  WORK_DEP --> Supabase
+  ANALYTICS --> BQ
+  API_DEP -.-> Prom
+  gke -.-> Prom
+```
+
+| Layer | Role |
+|-------|------|
+| **DNS / DR** | Health-checked failover to a secondary region (Phase 5) |
+| **Edge** | Cloud CDN + Cloud Armor in front of the HTTPS load balancer |
+| **VPC** | Private subnets for GKE nodes; Cloud NAT for vendor API egress |
+| **GKE** | Helm-deployed monolith or microservices, workers, eval-sandbox, analytics batch |
+| **Pub/Sub** | Decouples burst writes from synchronous API paths; DLQ for poison messages |
+| **Data** | Supabase OLTP; nightly ETL to BigQuery; GCS for static and R&D assets |
+| **Observability** | Prometheus metrics, Cloud Logging, Grafana dashboards — Phase 1 milestone before K8s cutover |
+
+GCP phased rollout table: [APPENDIX §8](../APPENDIX.md#8-infrastructure-philosophy) · Terraform workflow: [README Part 3](../README.md#part-3--trust-the-gate-optional).
 
 ---
 
