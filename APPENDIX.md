@@ -150,7 +150,7 @@ Each phase gate requires: offline agent eval suite passes, Layer 0 population ev
 | **2** | Duplicate rollups; consumer lag > SLO; DLQ spike | Disable consumers; monolith fallback |
 | **3+** | Agent eval failure; shadow diff on golden scans | Ingress **100% to monolith** |
 
-> Conceptual scaling diagram (one view): [architecture-reference §5](./docs/architecture-reference.md#5-conceptual-scaling-model) · Lightweight event model: [§4](./docs/architecture-reference.md#4-event-model)
+> Conceptual scaling diagram (one view): [architecture-reference §5](./docs/architecture-reference.md#5-conceptual-scaling-model) · Lightweight event model: [§4](./docs/architecture-reference.md#4-event-model) · Phased evolution: [§6](./docs/architecture-reference.md#6-phased-evolution) · GKE microservices target: [§7](./docs/architecture-reference.md#7-target-microservices-on-gke) · GKE cluster platform: [§8](./docs/architecture-reference.md#8-gke-cluster-platform)
 
 ---
 
@@ -295,6 +295,8 @@ Modular monolith (today)
 
 The **same app** keeps **one public API URL** behind a load balancer. Workers handle timeline rollups, recall alerts, and wearable sync so heavy jobs do not block scan or chat.
 
+> Phased path diagram: [architecture-reference §6](./docs/architecture-reference.md#6-phased-evolution) · GKE microservices target: [§7](./docs/architecture-reference.md#7-target-microservices-on-gke) · GKE cluster platform: [§8](./docs/architecture-reference.md#8-gke-cluster-platform)
+
 ### What never changes
 
 | Commitment | Why it matters to the lab |
@@ -329,7 +331,7 @@ Schema-per-service on **one Supabase Postgres** is an **interim** pattern — lo
 
 ### No Kubernetes in the current system
 
-Kubernetes appears in this lab **only** as Part 3's local eval-sandbox (kind + Terraform) — a teaching pattern for CI isolation, not production hosting. Production lift to GKE or EKS is **planned, not shipped**.
+Kubernetes appears in this lab **only** as Part 3's local eval-sandbox (kind + Terraform) — a teaching pattern for CI isolation, not production hosting. Production lift to GKE or EKS is **planned, not shipped**. Cluster-level GKE view: [architecture-reference §8](./docs/architecture-reference.md#8-gke-cluster-platform).
 
 ### Eventual platform options (when metrics justify)
 
